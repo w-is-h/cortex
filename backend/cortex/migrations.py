@@ -275,4 +275,42 @@ MIGRATIONS: list[str] = [
     END;
     PRAGMA foreign_keys=ON;
     """,
+    # v8: statuses move from the DB into code (cortex/statuses.py). Remap any custom
+    # keys onto the fixed set (done-flagged → done/live, the rest → a mid-flow status),
+    # then drop the table. notifications is also rebuilt with ON DELETE CASCADE so
+    # deleting a task/project/comment cleans up its notifications via the FKs.
+    """
+    UPDATE tasks SET status = CASE
+        WHEN status IN ('todo', 'in_progress', 'done') THEN status
+        WHEN EXISTS(SELECT 1 FROM statuses st WHERE st.space_id = tasks.space_id
+                    AND st.kind = 'task' AND st.key = tasks.status AND st.is_done = 1)
+            THEN 'done'
+        ELSE 'in_progress' END;
+    UPDATE projects SET status = CASE
+        WHEN status IN ('scoping', 'poc', 'development', 'live') THEN status
+        WHEN EXISTS(SELECT 1 FROM statuses st WHERE st.space_id = projects.space_id
+                    AND st.kind = 'project' AND st.key = projects.status AND st.is_done = 1)
+            THEN 'live'
+        ELSE 'development' END;
+    DROP TABLE statuses;
+
+    PRAGMA foreign_keys=OFF;
+    CREATE TABLE notifications_new (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        type TEXT NOT NULL
+            CHECK (type IN ('assigned', 'status_changed', 'commented', 'mentioned')),
+        actor_id INTEGER NOT NULL REFERENCES users(id),
+        task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        read_at TEXT
+    );
+    INSERT INTO notifications_new SELECT * FROM notifications;
+    DROP TABLE notifications;
+    ALTER TABLE notifications_new RENAME TO notifications;
+    CREATE INDEX idx_notifications_user ON notifications(user_id, read_at);
+    PRAGMA foreign_keys=ON;
+    """,
 ]

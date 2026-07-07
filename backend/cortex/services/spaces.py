@@ -2,7 +2,6 @@ import sqlite3
 
 from ..auth import now
 from ..errors import NotFound
-from . import statuses
 
 
 def list_spaces(db: sqlite3.Connection) -> list[dict]:
@@ -18,7 +17,6 @@ def get(db: sqlite3.Connection, space_id: int) -> dict:
 
 def create(db: sqlite3.Connection, name: str) -> dict:
     cur = db.execute("INSERT INTO spaces (name, created_at) VALUES (?, ?)", (name, now()))
-    statuses.seed_defaults(db, cur.lastrowid)
     return get(db, cur.lastrowid)
 
 

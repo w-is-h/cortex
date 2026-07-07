@@ -27,10 +27,7 @@ def create_project(body: ProjectCreate, user: User = Depends(require_user),
 @router.get("/{project_id}", response_model=ProjectDetail)
 def get_project(project_id: int, user: User = Depends(require_user),
                 db: sqlite3.Connection = Depends(get_db)):
-    project = projects.get(db, project_id)
-    project["comments"] = comments.list_for(db, "project", project_id)
-    project["tasks"] = tasks.list_tasks(db, project_id=project_id)
-    return project
+    return projects.detail(db, projects.get(db, project_id))
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)

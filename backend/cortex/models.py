@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-# statuses are now per-space & customizable, so a status is just its string key
-Status = str
+from .statuses import ProjectStatus, Status
+
 Priority = Literal["low", "medium", "high", "urgent"]
 
 
@@ -89,32 +89,6 @@ class SprintUpdate(BaseModel):
     archived: bool | None = None
 
 
-class StatusOut(BaseModel):
-    id: int
-    space_id: int
-    kind: str
-    key: str
-    label: str
-    color: str
-    sort_order: int
-    is_done: bool = False
-
-
-class StatusCreate(BaseModel):
-    space_id: int
-    kind: str
-    label: str
-    color: str = "#8b949e"
-    is_done: bool = False
-
-
-class StatusUpdate(BaseModel):
-    label: str | None = None
-    color: str | None = None
-    sort_order: int | None = None
-    is_done: bool | None = None
-
-
 class ProjectOut(BaseModel):
     id: int
     space_id: int
@@ -123,7 +97,7 @@ class ProjectOut(BaseModel):
     due_date: date
     start_date: date | None
     owner_id: int | None = None
-    status: str = "scoping"
+    status: ProjectStatus = "scoping"
     archived: bool
     created_at: str
     open_tasks: int = 0
@@ -137,7 +111,7 @@ class ProjectCreate(BaseModel):
     due_date: date
     start_date: date | None = None
     owner_id: int | None = None
-    status: str | None = None
+    status: ProjectStatus = "scoping"
 
 
 class ProjectUpdate(BaseModel):
@@ -146,7 +120,7 @@ class ProjectUpdate(BaseModel):
     due_date: date | None = None
     start_date: date | None = None
     owner_id: int | None = None
-    status: str | None = None
+    status: ProjectStatus | None = None
     archived: bool | None = None
 
 

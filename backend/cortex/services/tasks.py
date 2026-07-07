@@ -3,7 +3,8 @@ import sqlite3
 
 from ..auth import User, now
 from ..errors import Conflict, CortexError, NotFound
-from . import activity, notifications, spaces
+from ..statuses import DONE_TASK_KEYS
+from . import activity, comments, notifications, spaces
 
 
 def _gen_ref(db: sqlite3.Connection) -> str:
@@ -14,10 +15,11 @@ def _gen_ref(db: sqlite3.Connection) -> str:
             return ref
     raise CortexError("could not allocate a task ref")
 
-# a task is "done" when its status is flagged is_done in its space's status set
+DONE_KEYS_SQL = ", ".join(f"'{k}'" for k in DONE_TASK_KEYS)
+
+
 def not_done(alias: str) -> str:
-    return (f"{alias}.status NOT IN (SELECT key FROM statuses st "
-            f"WHERE st.space_id = {alias}.space_id AND st.kind = 'task' AND st.is_done = 1)")
+    return f"{alias}.status NOT IN ({DONE_KEYS_SQL})"
 
 
 BLOCKED_SQL = f"""EXISTS(
@@ -38,6 +40,25 @@ def get(db: sqlite3.Connection, task_id: int) -> dict:
     if row is None:
         raise NotFound("task not found")
     return _row_to_task(row)
+
+
+def get_by_ref(db: sqlite3.Connection, ref: str) -> dict:
+    row = db.execute(
+        f"SELECT t.*, {BLOCKED_SQL} FROM tasks t WHERE t.ref = ?", (ref,)
+    ).fetchone()
+    if row is None:
+        raise NotFound("task not found")
+    return _row_to_task(row)
+
+
+def detail(db: sqlite3.Connection, task: dict) -> dict:
+    """Attach comments, activity and blocker links to a task dict."""
+    task_id = task["id"]
+    task["comments"] = comments.list_for(db, "task", task_id)
+    task["activity"] = activity.list_for_task(db, task_id)
+    task["blockers"] = blockers_of(db, task_id)
+    task["blocking"] = blocking(db, task_id)
+    return task
 
 
 def list_tasks(db: sqlite3.Connection, space_id: int | None = None,
@@ -93,7 +114,8 @@ def _check_project(db, project_id: int | None, space_id: int):
 def _check_assignee(db, assignee_id: int | None):
     if assignee_id is None:
         return
-    if db.execute("SELECT 1 FROM users WHERE id = ?", (assignee_id,)).fetchone() is None:
+    if db.execute("SELECT 1 FROM users WHERE id = ? AND is_active = 1",
+                  (assignee_id,)).fetchone() is None:
         raise NotFound("assignee not found")
 
 
@@ -103,7 +125,9 @@ def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
     _check_sprint(db, data.get("sprint_id"), space_id)
     _check_project(db, data.get("project_id"), space_id)
     _check_assignee(db, data.get("assignee_id"))
-    next_order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1024 FROM tasks").fetchone()[0]
+    next_order = db.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) + 1024 FROM tasks WHERE space_id = ?",
+        (space_id,)).fetchone()[0]
     ts = now()
     cur = db.execute(
         """INSERT INTO tasks (space_id, title, description, status, priority,
@@ -187,8 +211,9 @@ def move_to_sprint(db: sqlite3.Connection, actor: User,
 
 def delete(db: sqlite3.Connection, actor: User, task_id: int) -> None:
     get(db, task_id)
+    # comments are polymorphic (parent_type/parent_id), so no FK cascade reaches them;
+    # everything else (blocks, activity, notifications, reactions) cascades.
     db.execute("DELETE FROM comments WHERE parent_type = 'task' AND parent_id = ?", (task_id,))
-    db.execute("DELETE FROM notifications WHERE task_id = ?", (task_id,))
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
 

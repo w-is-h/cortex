@@ -39,39 +39,8 @@ export const useStatuses = (spaceId: number | undefined, kind: 'task' | 'project
     queryKey: ['statuses', spaceId, kind],
     queryFn: () => api.get<StatusDef[]>(`/api/statuses${qs({ space_id: spaceId, kind })}`),
     enabled: spaceId !== undefined,
-    staleTime: 60_000,
+    staleTime: Infinity, // fixed in code — never changes at runtime
   })
-
-export function useCreateStatus() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: { space_id: number; kind: 'task' | 'project'; label: string; color?: string; is_done?: boolean }) =>
-      api.post<StatusDef>('/api/statuses', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['statuses'] }),
-  })
-}
-
-export function useUpdateStatus() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, ...patch }: Partial<StatusDef> & { id: number }) =>
-      api.patch<StatusDef>(`/api/statuses/${id}`, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['statuses'] }),
-  })
-}
-
-export function useDeleteStatus() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, reassignTo }: { id: number; reassignTo?: number }) =>
-      api.delete(`/api/statuses/${id}${reassignTo != null ? qs({ reassign_to: reassignTo }) : ''}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['statuses'] })
-      qc.invalidateQueries({ queryKey: ['tasks'] })
-      qc.invalidateQueries({ queryKey: ['projects'] })
-    },
-  })
-}
 
 export interface TaskFilters {
   space_id?: number

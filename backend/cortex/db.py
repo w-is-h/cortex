@@ -3,6 +3,7 @@
 import os
 import sqlite3
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from .migrations import MIGRATIONS
@@ -42,8 +43,9 @@ def migrate() -> None:
         conn.close()
 
 
-def get_db() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: connection per request, commit on success."""
+@contextmanager
+def transaction() -> Iterator[sqlite3.Connection]:
+    """Connection per unit of work: commit on success, rollback on error."""
     conn = connect()
     try:
         yield conn
@@ -53,3 +55,9 @@ def get_db() -> Iterator[sqlite3.Connection]:
         raise
     finally:
         conn.close()
+
+
+def get_db() -> Iterator[sqlite3.Connection]:
+    """FastAPI dependency form of transaction()."""
+    with transaction() as conn:
+        yield conn

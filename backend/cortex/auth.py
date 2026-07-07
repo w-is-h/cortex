@@ -36,6 +36,7 @@ def hash_key(key: str) -> str:
 
 
 def create_session(db: sqlite3.Connection, user_id: int) -> str:
+    db.execute("DELETE FROM sessions WHERE expires_at <= ?", (now(),))
     token = secrets.token_urlsafe(32)
     db.execute(
         "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
@@ -58,20 +59,28 @@ def create_api_key(db: sqlite3.Connection, user_id: int, name: str) -> tuple[dic
     return dict(row), key
 
 
+def user_from_api_key(db: sqlite3.Connection, key: str) -> User | None:
+    """Resolve a ck_* key to its (active) user and stamp last_used_at."""
+    digest = hash_key(key)
+    row = db.execute(
+        """SELECT u.id, u.username, u.is_admin FROM api_keys k
+           JOIN users u ON u.id = k.user_id
+           WHERE k.key_hash = ? AND u.is_active = 1""",
+        (digest,),
+    ).fetchone()
+    if row is None:
+        return None
+    db.execute("UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?", (now(), digest))
+    return User(row["id"], row["username"], bool(row["is_admin"]))
+
+
 def resolve_user(db: sqlite3.Connection, request: Request) -> User:
     auth = request.headers.get("authorization", "")
     if auth.startswith("Bearer " + KEY_PREFIX):
-        row = db.execute(
-            """SELECT u.id, u.username, u.is_admin FROM api_keys k
-               JOIN users u ON u.id = k.user_id
-               WHERE k.key_hash = ? AND u.is_active = 1""",
-            (hash_key(auth.removeprefix("Bearer ")),),
-        ).fetchone()
-        if row is None:
+        user = user_from_api_key(db, auth.removeprefix("Bearer "))
+        if user is None:
             raise Unauthorized("invalid API key")
-        db.execute("UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?",
-                   (now(), hash_key(auth.removeprefix("Bearer "))))
-        return User(row["id"], row["username"], bool(row["is_admin"]))
+        return user
 
     token = request.cookies.get(SESSION_COOKIE)
     if token:

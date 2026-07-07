@@ -27,7 +27,7 @@ def save(db: sqlite3.Connection, actor: User, data: bytes,
     return {"id": image_id, "url": f"/api/images/{image_id}"}
 
 
-def get(db: sqlite3.Connection, image_id: int) -> tuple[dict, str]:
+def get(db: sqlite3.Connection, image_id: str) -> tuple[dict, str]:
     row = db.execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone()
     if row is None:
         raise NotFound("image not found")

@@ -19,11 +19,11 @@ from mcp.client.streamable_http import streamablehttp_client
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 
 EXPECTED_TOOLS = {
-    "list_spaces", "list_users", "list_sprints", "create_sprint", "list_tasks",
-    "get_task", "create_task", "update_task", "move_tasks", "add_comment",
-    "add_reaction", "add_blocker", "remove_blocker", "list_projects",
-    "get_project", "create_project", "update_project", "search",
-    "list_notifications",
+    "get_workspace", "list_sprints", "create_sprint", "update_sprint",
+    "list_tasks", "get_task", "create_task", "update_task", "delete_task",
+    "move_tasks", "add_blocker", "remove_blocker", "add_comment",
+    "update_comment", "list_projects", "get_project", "create_project",
+    "update_project", "search", "list_notifications",
 }
 
 
@@ -51,6 +51,12 @@ async def main():
             tools = {t.name for t in (await session.list_tools()).tools}
             missing = EXPECTED_TOOLS - tools
             assert not missing, f"missing tools: {missing}"
+            extra = tools - EXPECTED_TOOLS
+            assert not extra, f"unexpected tools: {extra}"
+
+            ws = structured(await session.call_tool("get_workspace", {}))
+            assert ws["you"]["username"] == "admin"
+            assert [s["key"] for s in ws["task_statuses"]] == ["todo", "in_progress", "done"]
 
             sprints = structured(await session.call_tool(
                 "create_sprint", {"space_id": 1, "name": "mcp sprint",
@@ -66,7 +72,8 @@ async def main():
                 "add_comment", {"parent_type": "task", "parent_id": task["id"],
                                 "body": "hello from **mcp**"}))
 
-            got = structured(await session.call_tool("get_task", {"task_id": task["id"]}))
+            got = structured(await session.call_tool("get_task", {"ref": task["ref"]}))
+            assert got["id"] == task["id"], "ref lookup failed"
             assert got["sprint_id"] == sprints["id"], "move did not stick"
             assert got["comments"][0]["body"] == "hello from **mcp**"
             assert got["comments"][0]["author_username"] == "admin"

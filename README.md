@@ -9,8 +9,9 @@ teammate, while humans get a clean SPA.
 - **Spaces** → sprints, backlog, projects, tasks — each space is its own world.
 - **Board** with drag-and-drop kanban, a grouped list view, multi-select, and
   shift-click range select.
-- **Custom statuses** per space (columns, colors, a "done" flag) — set them in Admin;
-  the board columns follow.
+- **One opinionated workflow**: todo / in progress / done for tasks, scoping / PoC /
+  development / live for projects. Statuses live in code (`backend/cortex/statuses.py`) —
+  if yours differ, edit the list and the board, API validation and MCP docs all follow.
 - **Sprints** you can create, edit, and archive (auto-archives a week after it ends).
 - **Tasks**: Obsidian-style live-preview markdown (paste images, `@mentions`,
   clickable checkboxes), priorities, assignees, blockers, comments with reactions,
@@ -52,7 +53,7 @@ claude mcp add --transport http cortex http://localhost:8000/mcp \
 ```
 
 A key acts as its owner, so give an agent its own user if you want its actions
-attributed to it. MCP tools cover the whole workflow — list/create/update/move tasks,
-statuses, sprints, projects, comments, blockers, full-text `search` (with filters),
-and a regex `grep_tasks`. Agents should call `list_statuses` to learn a space's
-status keys before setting them.
+attributed to it. The MCP surface is deliberately small — 20 tools covering the verbs
+an agent actually performs: tasks (create/update/move/delete, blockers), sprints,
+projects, comments, full-text `search`, notifications, and one `get_workspace` call
+that returns who you are plus every id and status key the other tools expect.

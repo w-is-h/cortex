@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends
 
 from ..auth import User, require_user
 from ..db import get_db
-from ..models import (CommentCreate, CommentOut, Priority, Status, TaskCreate,
+from ..models import (CommentCreate, CommentOut, Status, TaskCreate,
                       TaskDetail, TaskMove, TaskOut, TaskUpdate)
-from ..services import activity, comments, tasks
+from ..services import comments, tasks
 
 router = APIRouter(prefix="/api/tasks")
 
@@ -36,12 +36,7 @@ def move_tasks(body: TaskMove, user: User = Depends(require_user),
 @router.get("/{task_id}", response_model=TaskDetail)
 def get_task(task_id: int, user: User = Depends(require_user),
              db: sqlite3.Connection = Depends(get_db)):
-    task = tasks.get(db, task_id)
-    task["comments"] = comments.list_for(db, "task", task_id)
-    task["activity"] = activity.list_for_task(db, task_id)
-    task["blockers"] = tasks.blockers_of(db, task_id)
-    task["blocking"] = tasks.blocking(db, task_id)
-    return task
+    return tasks.detail(db, tasks.get(db, task_id))
 
 
 @router.patch("/{task_id}", response_model=TaskOut)

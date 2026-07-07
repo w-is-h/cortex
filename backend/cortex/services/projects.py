@@ -3,12 +3,11 @@ from datetime import date
 
 from ..auth import User, now
 from ..errors import NotFound
-from . import spaces
+from . import comments, spaces, tasks
 
-COUNTS_SQL = """
+COUNTS_SQL = f"""
     (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id
-        AND t.status NOT IN (SELECT key FROM statuses st
-            WHERE st.space_id = t.space_id AND st.kind = 'task' AND st.is_done = 1)) AS open_tasks,
+        AND {tasks.not_done('t')}) AS open_tasks,
     (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) AS total_tasks
 """
 
@@ -46,9 +45,16 @@ def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (data["space_id"], data["title"], data.get("description", ""),
          _iso(data["due_date"]), _iso(data.get("start_date")), data.get("owner_id"),
-         data.get("status") or "scoping", now()),
+         data["status"], now()),
     )
     return get(db, cur.lastrowid)
+
+
+def detail(db: sqlite3.Connection, project: dict) -> dict:
+    """Attach comments and tasks to a project dict."""
+    project["comments"] = comments.list_for(db, "project", project["id"])
+    project["tasks"] = tasks.list_tasks(db, project_id=project["id"])
+    return project
 
 
 UPDATABLE = {"title", "description", "due_date", "start_date", "owner_id", "status", "archived"}

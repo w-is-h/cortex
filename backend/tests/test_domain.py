@@ -28,6 +28,19 @@ def make_project(c, title="proj", space_id=1, due="2026-08-01", **kwargs):
     return r.json()
 
 
+def test_status_vocabulary(admin):
+    # statuses are fixed in code: served read-only, enforced on write
+    defs = admin.get("/api/statuses", params={"space_id": 1}).json()
+    assert [d["key"] for d in defs if d["kind"] == "task"] == ["todo", "in_progress", "done"]
+    assert [d["key"] for d in defs if d["kind"] == "project"] == [
+        "scoping", "poc", "development", "live"]
+    assert admin.post("/api/statuses", json={}).status_code == 405
+    assert admin.post("/api/tasks", json={
+        "space_id": 1, "title": "x", "status": "banana"}).status_code == 422
+    t = make_task(admin)
+    assert admin.patch(f"/api/tasks/{t['id']}", json={"status": "banana"}).status_code == 422
+
+
 def test_spaces(admin):
     r = admin.get("/api/spaces")
     assert [s["name"] for s in r.json()] == ["General"]

@@ -1,37 +1,20 @@
-import sqlite3
+"""Read-only status vocabulary. Statuses are fixed in code (cortex/statuses.py);
+this endpoint exists so the UI has a single source of truth."""
 
 from fastapi import APIRouter, Depends
 
 from ..auth import User, require_user
-from ..db import get_db
-from ..models import StatusCreate, StatusOut, StatusUpdate
-from ..services import statuses
+from ..statuses import PROJECT_STATUSES, TASK_STATUSES
 
 router = APIRouter(prefix="/api/statuses")
 
 
-@router.get("", response_model=list[StatusOut])
-def list_statuses(space_id: int, kind: str | None = None,
-                  user: User = Depends(require_user),
-                  db: sqlite3.Connection = Depends(get_db)):
-    return statuses.list_statuses(db, space_id, kind)
-
-
-@router.post("", response_model=StatusOut)
-def create_status(body: StatusCreate, user: User = Depends(require_user),
-                  db: sqlite3.Connection = Depends(get_db)):
-    return statuses.create(db, body.space_id, body.kind, body.label, body.color, body.is_done)
-
-
-@router.patch("/{status_id}", response_model=StatusOut)
-def update_status(status_id: int, body: StatusUpdate, user: User = Depends(require_user),
-                  db: sqlite3.Connection = Depends(get_db)):
-    return statuses.update(db, status_id, **body.model_dump(exclude_unset=True))
-
-
-@router.delete("/{status_id}")
-def delete_status(status_id: int, reassign_to: int | None = None,
-                  user: User = Depends(require_user),
-                  db: sqlite3.Connection = Depends(get_db)):
-    statuses.remove(db, status_id, reassign_to)
-    return {"ok": True}
+@router.get("")
+def list_statuses(space_id: int | None = None, kind: str | None = None,
+                  user: User = Depends(require_user)):
+    out = []
+    for k, defs in (("task", TASK_STATUSES), ("project", PROJECT_STATUSES)):
+        if kind in (None, k):
+            out += [{"id": len(out) + i, "space_id": space_id, "kind": k,
+                     "sort_order": i, **s} for i, s in enumerate(defs)]
+    return out

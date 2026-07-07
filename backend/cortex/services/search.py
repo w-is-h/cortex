@@ -1,7 +1,7 @@
 import re
 import sqlite3
 
-TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
+TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 SNIPPET = "snippet({fts}, -1, '<mark>', '</mark>', '…', 12)"
 
 

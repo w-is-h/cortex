@@ -1,4 +1,4 @@
-// statuses are per-space and user-defined; a task/project status is its string key
+// statuses are fixed in code (backend cortex/statuses.py); a task/project status is its string key
 export type Status = string
 
 export interface StatusDef {
