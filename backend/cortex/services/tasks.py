@@ -3,7 +3,7 @@ import sqlite3
 
 from ..auth import User, now
 from ..errors import Conflict, CortexError, NotFound
-from ..statuses import DONE_KEYS
+from ..statuses import PROJECT_DONE_KEYS, TASK_DONE_KEYS
 from . import activity, comments, notifications, spaces, sprints
 
 
@@ -15,7 +15,7 @@ def _gen_ref(db: sqlite3.Connection) -> str:
             return ref
     raise CortexError("could not allocate a task ref")
 
-DONE_KEYS_SQL = ", ".join(f"'{k}'" for k in DONE_KEYS)
+DONE_KEYS_SQL = ", ".join(f"'{k}'" for k in TASK_DONE_KEYS)
 
 
 def not_done(alias: str) -> str:
@@ -112,7 +112,7 @@ def _check_project(db, project_id: int | None, space_id: int):
         raise Conflict("project belongs to a different space")
     if row["archived"]:
         raise Conflict("project is archived")
-    if row["status"] in DONE_KEYS:
+    if row["status"] in PROJECT_DONE_KEYS:
         raise Conflict("project is done — reopen it before adding tasks")
 
 

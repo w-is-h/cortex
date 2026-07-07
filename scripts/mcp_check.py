@@ -56,7 +56,8 @@ async def main():
 
             ws = structured(await session.call_tool("get_workspace", {}))
             assert ws["you"]["username"] == "admin"
-            assert [s["key"] for s in ws["statuses"]] == ["todo", "in_progress", "done"]
+            assert [s["key"] for s in ws["task_statuses"]] == ["todo", "in_progress", "done"]
+            assert [s["key"] for s in ws["project_statuses"]] == ["todo", "in_progress", "done"]
             assert isinstance(ws["project_tags"], list)
 
             sprints = structured(await session.call_tool(

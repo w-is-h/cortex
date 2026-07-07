@@ -21,7 +21,8 @@ def as_admin(app):
 def test_workspace_clear_and_ref(as_admin):
     ws = mcp_server.get_workspace()
     assert ws["you"]["id"] == 1
-    assert [s["key"] for s in ws["statuses"]] == ["todo", "in_progress", "done"]
+    assert [s["key"] for s in ws["task_statuses"]] == ["todo", "in_progress", "done"]
+    assert [s["key"] for s in ws["project_statuses"]] == ["todo", "in_progress", "done"]
 
     p = mcp_server.create_project(space_id=1, title="deploy", tags=["#Live"])
     assert p["tags"] == ["live"] and p["due_date"] is None

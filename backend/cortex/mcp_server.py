@@ -17,7 +17,7 @@ from .auth import User, user_from_api_key
 from .models import Priority
 from .services import (comments, notifications, projects,
                        search as search_service, spaces, sprints, tasks, users)
-from .statuses import STATUSES, Status
+from .statuses import PROJECT_STATUSES, TASK_STATUSES, ProjectStatus, Status
 
 CURRENT_USER: ContextVar[User | None] = ContextVar("cortex_mcp_user", default=None)
 
@@ -63,9 +63,8 @@ class ApiKeyAuthMiddleware:
 
 def get_workspace() -> dict:
     """Everything needed to orient: who you are, all spaces, all users, the status
-    vocabulary (tasks and projects share one lifecycle: todo/in_progress/done), and
-    the project tags in use. Call this first — it resolves the ids and keys every
-    other tool expects."""
+    vocabularies for tasks and projects, and the project tags in use. Call this
+    first — it resolves the ids and keys every other tool expects."""
     me = current_user()
     with db.transaction() as conn:
         rows = conn.execute("SELECT tags FROM projects WHERE tags != ''")
@@ -73,7 +72,8 @@ def get_workspace() -> dict:
             "you": {"id": me.id, "username": me.username, "is_admin": me.is_admin},
             "spaces": spaces.list_spaces(conn),
             "users": users.list_users(conn),
-            "statuses": STATUSES,
+            "task_statuses": TASK_STATUSES,
+            "project_statuses": PROJECT_STATUSES,
             "project_tags": sorted({t for r in rows for t in r["tags"].split()}),
         }
 
@@ -210,7 +210,7 @@ def get_project(project_id: int) -> dict:
 
 def create_project(space_id: int, title: str, description: str = "",
                    due_date: str | None = None, start_date: str | None = None,
-                   owner_id: int | None = None, status: Status = "todo",
+                   owner_id: int | None = None, status: ProjectStatus = "todo",
                    tags: list[str] | None = None) -> dict:
     """Create a project. Deliverables get a due_date (YYYY-MM-DD, shows on the
     timeline); ongoing/stream projects omit it. tags are freeform lowercase labels
@@ -227,7 +227,7 @@ ClearableProjectField = Literal["owner_id", "start_date", "due_date", "descripti
 
 def update_project(project_id: int, title: str | None = None, description: str | None = None,
                    due_date: str | None = None, start_date: str | None = None,
-                   owner_id: int | None = None, status: Status | None = None,
+                   owner_id: int | None = None, status: ProjectStatus | None = None,
                    tags: list[str] | None = None, archived: bool | None = None,
                    clear: list[ClearableProjectField] | None = None) -> dict:
     """Update a project; only the fields you pass change. tags replaces the whole
