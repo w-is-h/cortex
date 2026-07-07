@@ -55,6 +55,9 @@ def test_sprint_crud_and_current(admin):
     assert s["is_current"] is True
     old = make_sprint(admin, name="past", start=day(-30), end=day(-24))
     assert old["is_current"] is False
+    assert old["archived"] is True  # auto: end + 7d passed
+    r = admin.patch(f"/api/sprints/{old['id']}", json={"archived": False}).json()
+    assert r["archived"] is False  # manual override beats auto
     assert admin.post("/api/sprints", json={
         "space_id": 1, "name": "bad", "start_date": day(3), "end_date": day(-3)
     }).status_code == 400
