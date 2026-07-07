@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .statuses import ProjectStatus, Status
+from .statuses import Status
 
 Priority = Literal["low", "medium", "high", "urgent"]
 
@@ -94,10 +94,11 @@ class ProjectOut(BaseModel):
     space_id: int
     title: str
     description: str
-    due_date: date
+    due_date: date | None
     start_date: date | None
     owner_id: int | None = None
-    status: ProjectStatus = "scoping"
+    status: Status = "todo"
+    tags: list[str] = []
     archived: bool
     created_at: str
     open_tasks: int = 0
@@ -108,10 +109,11 @@ class ProjectCreate(BaseModel):
     space_id: int
     title: str
     description: str = ""
-    due_date: date
+    due_date: date | None = None
     start_date: date | None = None
     owner_id: int | None = None
-    status: ProjectStatus = "scoping"
+    status: Status = "todo"
+    tags: list[str] = []
 
 
 class ProjectUpdate(BaseModel):
@@ -120,7 +122,8 @@ class ProjectUpdate(BaseModel):
     due_date: date | None = None
     start_date: date | None = None
     owner_id: int | None = None
-    status: ProjectStatus | None = None
+    status: Status | None = None
+    tags: list[str] | None = None
     archived: bool | None = None
 
 

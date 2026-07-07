@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from datetime import date
 
@@ -15,16 +16,32 @@ COUNTS_SQL = f"""
 def _row(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["archived"] = bool(d["archived"])
+    d["tags"] = d["tags"].split()
     return d
 
 
-def list_projects(db: sqlite3.Connection, space_id: int,
-                  include_archived: bool = False) -> list[dict]:
-    clause = "" if include_archived else "AND p.archived = 0"
+def norm_tags(tags: list[str]) -> list[str]:
+    """lowercase, no leading '#', hyphens for inner spaces, deduped in order."""
+    out: list[str] = []
+    for tag in tags:
+        tag = re.sub(r"\s+", "-", tag.strip().lstrip("#").lower())
+        if tag and tag not in out:
+            out.append(tag)
+    return out
+
+
+def list_projects(db: sqlite3.Connection, space_id: int, include_archived: bool = False,
+                  tags: list[str] | None = None) -> list[dict]:
+    clauses, params = ["p.space_id = ?"], [space_id]
+    if not include_archived:
+        clauses.append("p.archived = 0")
+    for tag in norm_tags(tags or []):  # AND semantics: every tag must be present
+        clauses.append("' ' || p.tags || ' ' LIKE ?")
+        params.append(f"% {tag} %")
     rows = db.execute(
-        f"SELECT p.*, {COUNTS_SQL} FROM projects p WHERE p.space_id = ? {clause} "
-        "ORDER BY p.due_date, p.id",
-        (space_id,),
+        f"SELECT p.*, {COUNTS_SQL} FROM projects p WHERE {' AND '.join(clauses)} "
+        "ORDER BY p.due_date IS NULL, p.due_date, p.id",
+        params,
     )
     return [_row(r) for r in rows]
 
@@ -41,11 +58,12 @@ def get(db: sqlite3.Connection, project_id: int) -> dict:
 def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
     spaces.get(db, data["space_id"])
     cur = db.execute(
-        """INSERT INTO projects (space_id, title, description, due_date, start_date, owner_id, status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO projects (space_id, title, description, due_date, start_date,
+               owner_id, status, tags, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (data["space_id"], data["title"], data.get("description", ""),
-         _iso(data["due_date"]), _iso(data.get("start_date")), data.get("owner_id"),
-         data["status"], now()),
+         _iso(data.get("due_date")), _iso(data.get("start_date")), data.get("owner_id"),
+         data["status"], " ".join(norm_tags(data.get("tags") or [])), now()),
     )
     return get(db, cur.lastrowid)
 
@@ -57,7 +75,8 @@ def detail(db: sqlite3.Connection, project: dict) -> dict:
     return project
 
 
-UPDATABLE = {"title", "description", "due_date", "start_date", "owner_id", "status", "archived"}
+UPDATABLE = {"title", "description", "due_date", "start_date", "owner_id",
+             "status", "tags", "archived"}
 
 
 def update(db: sqlite3.Connection, actor: User, project_id: int, fields: dict) -> dict:
@@ -65,7 +84,9 @@ def update(db: sqlite3.Connection, actor: User, project_id: int, fields: dict) -
     fields = {k: v for k, v in fields.items() if k in UPDATABLE}
     if not fields:
         return get(db, project_id)
-    values = [int(v) if isinstance(v, bool) else _iso(v) if isinstance(v, date) else v
+    values = [" ".join(norm_tags(v)) if isinstance(v, list)
+              else int(v) if isinstance(v, bool)
+              else _iso(v) if isinstance(v, date) else v
               for v in fields.values()]
     sets = ", ".join(f"{k} = ?" for k in fields)
     db.execute(f"UPDATE projects SET {sets} WHERE id = ?", (*values, project_id))

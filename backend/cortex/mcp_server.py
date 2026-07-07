@@ -17,7 +17,7 @@ from .auth import User, user_from_api_key
 from .models import Priority
 from .services import (comments, notifications, projects,
                        search as search_service, spaces, sprints, tasks, users)
-from .statuses import PROJECT_STATUSES, TASK_STATUSES, ProjectStatus, Status
+from .statuses import STATUSES, Status
 
 CURRENT_USER: ContextVar[User | None] = ContextVar("cortex_mcp_user", default=None)
 
@@ -62,17 +62,19 @@ class ApiKeyAuthMiddleware:
 # ---------------------------------------------------------------- tools
 
 def get_workspace() -> dict:
-    """Everything needed to orient: who you are, all spaces, all users, and the
-    status vocabularies for tasks and projects. Call this first — it resolves the
-    ids and status keys every other tool expects."""
+    """Everything needed to orient: who you are, all spaces, all users, the status
+    vocabulary (tasks and projects share one lifecycle: todo/in_progress/done), and
+    the project tags in use. Call this first — it resolves the ids and keys every
+    other tool expects."""
     me = current_user()
     with db.transaction() as conn:
+        rows = conn.execute("SELECT tags FROM projects WHERE tags != ''")
         return {
             "you": {"id": me.id, "username": me.username, "is_admin": me.is_admin},
             "spaces": spaces.list_spaces(conn),
             "users": users.list_users(conn),
-            "task_statuses": TASK_STATUSES,
-            "project_statuses": PROJECT_STATUSES,
+            "statuses": STATUSES,
+            "project_tags": sorted({t for r in rows for t in r["tags"].split()}),
         }
 
 
@@ -192,10 +194,12 @@ def update_comment(comment_id: int, body: str) -> dict:
         return comments.update(conn, current_user(), comment_id, body)
 
 
-def list_projects(space_id: int, include_archived: bool = False) -> list[dict]:
-    """List a space's projects with due dates and open/total task counts."""
+def list_projects(space_id: int, include_archived: bool = False,
+                  tags: list[str] | None = None) -> list[dict]:
+    """List a space's projects with tags, due dates and open/total task counts.
+    tags filters with AND semantics: every named tag must be present."""
     with db.transaction() as conn:
-        return projects.list_projects(conn, space_id, include_archived)
+        return projects.list_projects(conn, space_id, include_archived, tags=tags)
 
 
 def get_project(project_id: int) -> dict:
@@ -204,31 +208,34 @@ def get_project(project_id: int) -> dict:
         return projects.detail(conn, projects.get(conn, project_id))
 
 
-def create_project(space_id: int, title: str, due_date: str, description: str = "",
-                   start_date: str | None = None, owner_id: int | None = None,
-                   status: ProjectStatus = "scoping") -> dict:
-    """Create a project. due_date (YYYY-MM-DD) is required; start_date shows on the
-    timeline. owner_id assigns an owning user."""
+def create_project(space_id: int, title: str, description: str = "",
+                   due_date: str | None = None, start_date: str | None = None,
+                   owner_id: int | None = None, status: Status = "todo",
+                   tags: list[str] | None = None) -> dict:
+    """Create a project. Deliverables get a due_date (YYYY-MM-DD, shows on the
+    timeline); ongoing/stream projects omit it. tags are freeform lowercase labels
+    (e.g. ['live', 'client-acme']) — see get_workspace for the vocabulary in use."""
     with db.transaction() as conn:
         return projects.create(conn, current_user(), {
             "space_id": space_id, "title": title, "description": description,
             "due_date": due_date, "start_date": start_date,
-            "owner_id": owner_id, "status": status})
+            "owner_id": owner_id, "status": status, "tags": tags or []})
 
 
-ClearableProjectField = Literal["owner_id", "start_date", "description"]
+ClearableProjectField = Literal["owner_id", "start_date", "due_date", "description"]
 
 
 def update_project(project_id: int, title: str | None = None, description: str | None = None,
                    due_date: str | None = None, start_date: str | None = None,
-                   owner_id: int | None = None, status: ProjectStatus | None = None,
-                   archived: bool | None = None,
+                   owner_id: int | None = None, status: Status | None = None,
+                   tags: list[str] | None = None, archived: bool | None = None,
                    clear: list[ClearableProjectField] | None = None) -> dict:
-    """Update a project; only the fields you pass change. To empty a field, name it
-    in `clear` instead — e.g. clear=["owner_id"]."""
+    """Update a project; only the fields you pass change. tags replaces the whole
+    tag set (pass [] to remove all). To empty another field, name it in `clear` —
+    e.g. clear=["owner_id"]."""
     fields = {k: v for k, v in {"title": title, "description": description,
                                 "due_date": due_date, "start_date": start_date,
-                                "owner_id": owner_id, "status": status,
+                                "owner_id": owner_id, "status": status, "tags": tags,
                                 "archived": archived}.items() if v is not None}
     for key in clear or []:
         fields[key] = "" if key == "description" else None

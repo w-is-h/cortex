@@ -1,6 +1,6 @@
 import sqlite3
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from ..auth import User, require_user
 from ..db import get_db
@@ -13,9 +13,10 @@ router = APIRouter(prefix="/api/projects")
 
 @router.get("", response_model=list[ProjectOut])
 def list_projects(space_id: int, include_archived: bool = False,
+                  tags: list[str] | None = Query(default=None),
                   user: User = Depends(require_user),
                   db: sqlite3.Connection = Depends(get_db)):
-    return projects.list_projects(db, space_id, include_archived)
+    return projects.list_projects(db, space_id, include_archived, tags=tags)
 
 
 @router.post("", response_model=ProjectOut)

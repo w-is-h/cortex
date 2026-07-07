@@ -31,9 +31,10 @@ def make_project(c, title="proj", space_id=1, due="2026-08-01", **kwargs):
 def test_status_vocabulary(admin):
     # statuses are fixed in code: served read-only, enforced on write
     defs = admin.get("/api/statuses", params={"space_id": 1}).json()
-    assert [d["key"] for d in defs if d["kind"] == "task"] == ["todo", "in_progress", "done"]
-    assert [d["key"] for d in defs if d["kind"] == "project"] == [
-        "scoping", "poc", "development", "live"]
+    # tasks and projects share one lifecycle
+    for kind in ("task", "project"):
+        assert [d["key"] for d in defs if d["kind"] == kind] == [
+            "todo", "in_progress", "done"]
     assert admin.post("/api/statuses", json={}).status_code == 405
     assert admin.post("/api/tasks", json={
         "space_id": 1, "title": "x", "status": "banana"}).status_code == 422
@@ -152,8 +153,41 @@ def test_projects(admin):
     assert admin.get("/api/projects", params={"space_id": 1}).json() == []
     assert len(admin.get("/api/projects",
                          params={"space_id": 1, "include_archived": True}).json()) == 1
-    # due_date is required
-    assert admin.post("/api/projects", json={"space_id": 1, "title": "x"}).status_code == 422
+    # stream projects have no due date; the lifecycle default is todo
+    stream = admin.post("/api/projects", json={"space_id": 1, "title": "maintenance"}).json()
+    assert stream["due_date"] is None and stream["status"] == "todo"
+
+
+def test_project_tags(admin):
+    p = make_project(admin, title="deploy", tags=["#Live", "Client ACME", "live"])
+    assert p["tags"] == ["live", "client-acme"]  # normalized, deduped, ordered
+    make_project(admin, title="other", tags=["live"])
+    make_project(admin, title="untagged")
+    both = admin.get("/api/projects", params={"space_id": 1, "tags": ["live"]}).json()
+    assert len(both) == 2
+    # AND semantics: both tags must be present
+    one = admin.get("/api/projects",
+                    params={"space_id": 1, "tags": ["live", "client-acme"]}).json()
+    assert [x["id"] for x in one] == [p["id"]]
+    cleared = admin.patch(f"/api/projects/{p['id']}", json={"tags": []}).json()
+    assert cleared["tags"] == []
+
+
+def test_guards(admin):
+    done = make_project(admin, title="shipped", status="done")
+    assert admin.post("/api/tasks", json={
+        "space_id": 1, "title": "x", "project_id": done["id"]}).status_code == 409
+    archived = make_project(admin, title="old")
+    admin.patch(f"/api/projects/{archived['id']}", json={"archived": True})
+    t = make_task(admin)
+    assert admin.patch(f"/api/tasks/{t['id']}",
+                       json={"project_id": archived["id"]}).status_code == 409
+    old_sprint = make_sprint(admin, name="ancient", start=day(-30), end=day(-24))
+    assert admin.post("/api/tasks/move", json={
+        "task_ids": [t["id"]], "sprint_id": old_sprint["id"]}).status_code == 409
+    other = admin.post("/api/spaces", json={"name": "Elsewhere"}).json()
+    foreign = make_task(admin, space_id=other["id"])
+    assert admin.put(f"/api/tasks/{t['id']}/blockers/{foreign['id']}").status_code == 409
 
 
 def test_comments_on_both_parents(admin, client):

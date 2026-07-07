@@ -313,4 +313,45 @@ MIGRATIONS: list[str] = [
     CREATE INDEX idx_notifications_user ON notifications(user_id, read_at);
     PRAGMA foreign_keys=ON;
     """,
+    # v9: projects join the task lifecycle (todo/in_progress/done); the old phase
+    # vocabulary (scoping/poc/development/live) becomes a tag on each project.
+    # due_date turns optional (stream projects have none) — SQLite can't drop
+    # NOT NULL, so rebuild the table (+ its FTS triggers), adding `tags`.
+    """
+    PRAGMA foreign_keys=OFF;
+    CREATE TABLE projects_new (
+        id INTEGER PRIMARY KEY,
+        space_id INTEGER NOT NULL REFERENCES spaces(id),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        due_date TEXT,
+        start_date TEXT,
+        archived INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        owner_id INTEGER REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'todo',
+        tags TEXT NOT NULL DEFAULT ''
+    );
+    INSERT INTO projects_new (id, space_id, title, description, due_date, start_date,
+        archived, created_at, owner_id, status, tags)
+      SELECT id, space_id, title, description, due_date, start_date,
+        archived, created_at, owner_id, 'in_progress', status FROM projects;
+    DROP TABLE projects;
+    ALTER TABLE projects_new RENAME TO projects;
+    CREATE TRIGGER projects_fts_ai AFTER INSERT ON projects BEGIN
+        INSERT INTO projects_fts(rowid, title, description)
+        VALUES (new.id, new.title, new.description);
+    END;
+    CREATE TRIGGER projects_fts_ad AFTER DELETE ON projects BEGIN
+        INSERT INTO projects_fts(projects_fts, rowid, title, description)
+        VALUES ('delete', old.id, old.title, old.description);
+    END;
+    CREATE TRIGGER projects_fts_au AFTER UPDATE OF title, description ON projects BEGIN
+        INSERT INTO projects_fts(projects_fts, rowid, title, description)
+        VALUES ('delete', old.id, old.title, old.description);
+        INSERT INTO projects_fts(rowid, title, description)
+        VALUES (new.id, new.title, new.description);
+    END;
+    PRAGMA foreign_keys=ON;
+    """,
 ]

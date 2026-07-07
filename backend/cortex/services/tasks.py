@@ -3,8 +3,8 @@ import sqlite3
 
 from ..auth import User, now
 from ..errors import Conflict, CortexError, NotFound
-from ..statuses import DONE_TASK_KEYS
-from . import activity, comments, notifications, spaces
+from ..statuses import DONE_KEYS
+from . import activity, comments, notifications, spaces, sprints
 
 
 def _gen_ref(db: sqlite3.Connection) -> str:
@@ -15,7 +15,7 @@ def _gen_ref(db: sqlite3.Connection) -> str:
             return ref
     raise CortexError("could not allocate a task ref")
 
-DONE_KEYS_SQL = ", ".join(f"'{k}'" for k in DONE_TASK_KEYS)
+DONE_KEYS_SQL = ", ".join(f"'{k}'" for k in DONE_KEYS)
 
 
 def not_done(alias: str) -> str:
@@ -94,21 +94,26 @@ def list_tasks(db: sqlite3.Connection, space_id: int | None = None,
 def _check_sprint(db, sprint_id: int | None, space_id: int):
     if sprint_id is None:
         return
-    row = db.execute("SELECT space_id FROM sprints WHERE id = ?", (sprint_id,)).fetchone()
-    if row is None:
-        raise NotFound("sprint not found")
-    if row["space_id"] != space_id:
+    sprint = sprints.get(db, sprint_id)
+    if sprint["space_id"] != space_id:
         raise Conflict("sprint belongs to a different space")
+    if sprint["archived"]:
+        raise Conflict("sprint is archived")
 
 
 def _check_project(db, project_id: int | None, space_id: int):
     if project_id is None:
         return
-    row = db.execute("SELECT space_id FROM projects WHERE id = ?", (project_id,)).fetchone()
+    row = db.execute("SELECT space_id, status, archived FROM projects WHERE id = ?",
+                     (project_id,)).fetchone()
     if row is None:
         raise NotFound("project not found")
     if row["space_id"] != space_id:
         raise Conflict("project belongs to a different space")
+    if row["archived"]:
+        raise Conflict("project is archived")
+    if row["status"] in DONE_KEYS:
+        raise Conflict("project is done — reopen it before adding tasks")
 
 
 def _check_assignee(db, assignee_id: int | None):
@@ -218,9 +223,11 @@ def delete(db: sqlite3.Connection, actor: User, task_id: int) -> None:
 
 
 def add_blocker(db: sqlite3.Connection, actor: User, task_id: int, blocker_id: int) -> dict:
-    get(db, blocker_id)
+    blocker = get(db, blocker_id)
     if task_id == blocker_id:
         raise Conflict("a task cannot block itself")
+    if get(db, task_id)["space_id"] != blocker["space_id"]:
+        raise Conflict("blocker belongs to a different space")
     # cycle check: does task_id already (transitively) block blocker_id?
     frontier, seen = [task_id], set()
     while frontier:

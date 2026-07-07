@@ -9,15 +9,16 @@ teammate, while humans get a clean SPA.
 - **Spaces** → sprints, backlog, projects, tasks — each space is its own world.
 - **Board** with drag-and-drop kanban, a grouped list view, multi-select, and
   shift-click range select.
-- **One opinionated workflow**: todo / in progress / done for tasks, scoping / PoC /
-  development / live for projects. Statuses live in code (`backend/cortex/statuses.py`) —
-  if yours differ, edit the list and the board, API validation and MCP docs all follow.
+- **One opinionated lifecycle**: todo / in progress / done — for tasks and projects
+  alike. Statuses live in code (`backend/cortex/statuses.py`) — if yours differ, edit
+  the list and the board, API validation and MCP docs all follow. Domain vocabulary
+  (phases, clients, "live") goes in project **tags** instead.
 - **Sprints** you can create, edit, and archive (auto-archives a week after it ends).
 - **Tasks**: Obsidian-style live-preview markdown (paste images, `@mentions`,
   clickable checkboxes), priorities, assignees, blockers, comments with reactions,
   and a per-task activity trail. Each task gets a shareable id like `cx-123456789`.
-- **Projects** with an owner, a status, due dates, and a drag-to-resize timeline
-  (weeks / months).
+- **Projects** with an owner, freeform tags, and a drag-to-resize timeline
+  (weeks / months). Deliverables get a due date; ongoing/stream projects just don't.
 - **Light & dark** themes and ⌘K search with filters (type, status, has-images).
 
 ## Run

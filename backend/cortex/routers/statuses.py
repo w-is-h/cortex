@@ -4,7 +4,7 @@ this endpoint exists so the UI has a single source of truth."""
 from fastapi import APIRouter, Depends
 
 from ..auth import User, require_user
-from ..statuses import PROJECT_STATUSES, TASK_STATUSES
+from ..statuses import STATUSES
 
 router = APIRouter(prefix="/api/statuses")
 
@@ -12,9 +12,10 @@ router = APIRouter(prefix="/api/statuses")
 @router.get("")
 def list_statuses(space_id: int | None = None, kind: str | None = None,
                   user: User = Depends(require_user)):
+    """Tasks and projects share one lifecycle, so `kind` only shapes the response."""
     out = []
-    for k, defs in (("task", TASK_STATUSES), ("project", PROJECT_STATUSES)):
+    for k in ("task", "project"):
         if kind in (None, k):
             out += [{"id": len(out) + i, "space_id": space_id, "kind": k,
-                     "sort_order": i, **s} for i, s in enumerate(defs)]
+                     "sort_order": i, **s} for i, s in enumerate(STATUSES)]
     return out
