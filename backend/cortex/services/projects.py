@@ -1,0 +1,70 @@
+import sqlite3
+from datetime import date
+
+from ..auth import User, now
+from ..errors import NotFound
+from . import spaces
+
+COUNTS_SQL = """
+    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id
+        AND t.status NOT IN (SELECT key FROM statuses st
+            WHERE st.space_id = t.space_id AND st.kind = 'task' AND st.is_done = 1)) AS open_tasks,
+    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) AS total_tasks
+"""
+
+
+def _row(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["archived"] = bool(d["archived"])
+    return d
+
+
+def list_projects(db: sqlite3.Connection, space_id: int,
+                  include_archived: bool = False) -> list[dict]:
+    clause = "" if include_archived else "AND p.archived = 0"
+    rows = db.execute(
+        f"SELECT p.*, {COUNTS_SQL} FROM projects p WHERE p.space_id = ? {clause} "
+        "ORDER BY p.due_date, p.id",
+        (space_id,),
+    )
+    return [_row(r) for r in rows]
+
+
+def get(db: sqlite3.Connection, project_id: int) -> dict:
+    row = db.execute(
+        f"SELECT p.*, {COUNTS_SQL} FROM projects p WHERE p.id = ?", (project_id,)
+    ).fetchone()
+    if row is None:
+        raise NotFound("project not found")
+    return _row(row)
+
+
+def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
+    spaces.get(db, data["space_id"])
+    cur = db.execute(
+        """INSERT INTO projects (space_id, title, description, due_date, start_date, owner_id, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (data["space_id"], data["title"], data.get("description", ""),
+         _iso(data["due_date"]), _iso(data.get("start_date")), data.get("owner_id"),
+         data.get("status") or "scoping", now()),
+    )
+    return get(db, cur.lastrowid)
+
+
+UPDATABLE = {"title", "description", "due_date", "start_date", "owner_id", "status", "archived"}
+
+
+def update(db: sqlite3.Connection, actor: User, project_id: int, fields: dict) -> dict:
+    get(db, project_id)
+    fields = {k: v for k, v in fields.items() if k in UPDATABLE}
+    if not fields:
+        return get(db, project_id)
+    values = [int(v) if isinstance(v, bool) else _iso(v) if isinstance(v, date) else v
+              for v in fields.values()]
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    db.execute(f"UPDATE projects SET {sets} WHERE id = ?", (*values, project_id))
+    return get(db, project_id)
+
+
+def _iso(value):
+    return value.isoformat() if isinstance(value, date) else value

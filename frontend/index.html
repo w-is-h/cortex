@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0c0f'/%3E%3Cg fill='none' stroke='%232dd4bf' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 17 H10 L13 8 L16.5 24 L19 17 H23'/%3E%3C/g%3E%3Ccircle cx='25.5' cy='17' r='2' fill='%232dd4bf'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0e1012" />
+    <title>cortex</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <script>
+      // apply the saved theme before first paint to avoid a flash
+      (function () {
+        var t = localStorage.getItem('cortex.theme') === 'light' ? 'light' : 'dark'
+        var r = document.documentElement
+        if (t === 'dark') r.classList.add('dark')
+        r.style.colorScheme = t
+        r.style.background = t === 'dark' ? '#0b0c0f' : '#f5f6f8'
+      })()
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

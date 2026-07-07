@@ -1,0 +1,25 @@
+# runtime data (sqlite db + uploaded images)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# node / frontend build
+node_modules/
+frontend/dist/
+
+# scratch / local
+tmp/
+.DS_Store
+*.log
+
+# local dev / editor
+.claude/
+*.swp
+*.swo

@@ -1,0 +1,245 @@
+import { ChevronRight, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  useBlockerMutation, useDeleteTask, useProjects, useSprints, useTask, useTasks,
+  useUpdateTask, useUsers,
+} from '../api/hooks'
+import type { TaskDetail } from '../api/types'
+import { Feed } from '../components/Feed'
+import { MarkdownEditor } from '../components/MarkdownEditor'
+import { useSpace } from '../components/Shell'
+import { BlockedTag, PRIO_OPTS, TaskLink } from '../components/TaskBits'
+import { useStatusDefs } from '../components/statuses'
+import { Field, Pick } from '../components/ui'
+
+export function TaskPage() {
+  const { id } = useParams()
+  const task = useTask(Number(id))
+  if (task.isPending) return null
+  if (task.isError || !task.data) return <div className="text-sm text-ink-faint py-10 text-center">Task not found.</div>
+  return <TaskView task={task.data} />
+}
+
+/** A soft card that mirrors the New Task modal's styling. */
+const card =
+  'bg-card border border-line rounded-2xl shadow-sm shadow-black/5 dark:shadow-none'
+
+function TaskView({ task }: { task: TaskDetail }) {
+  const { space } = useSpace()
+  const update = useUpdateTask()
+  const del = useDeleteTask()
+  const navigate = useNavigate()
+  const users = useUsers()
+  const sprints = useSprints(space.id)
+  const projects = useProjects(space.id)
+
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [title, setTitle] = useState(task.title)
+  const [desc, setDesc] = useState(task.description)
+
+  useEffect(() => { setTitle(task.title) }, [task.title])
+  useEffect(() => { setDesc(task.description) }, [task.description])
+
+  // Save the description once, on blur (and on unmount) — not per keystroke — so a
+  // single edit produces one activity entry instead of one per pause.
+  const descRef = useRef(desc)
+  const savedRef = useRef(task.description)
+  descRef.current = desc
+  useEffect(() => { savedRef.current = task.description }, [task.description])
+  const saveDesc = () => {
+    if (descRef.current !== savedRef.current) {
+      savedRef.current = descRef.current
+      update.mutate({ id: task.id, description: descRef.current })
+    }
+  }
+  useEffect(() => () => saveDesc(), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (patch: Record<string, unknown>) => update.mutate({ id: task.id, ...patch })
+  const { list: taskStatuses } = useStatusDefs('task')
+
+  const saveTitle = () => {
+    setEditingTitle(false)
+    if (title.trim() && title !== task.title) update.mutate({ id: task.id, title: title.trim() })
+    else setTitle(task.title)
+  }
+
+  const onDelete = async () => {
+    if (confirm('Delete this task?')) {
+      await del.mutateAsync(task.id)
+      navigate(-1)
+    }
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(440px,1fr)] gap-6">
+      {/* ---------------------------------------------------- main card */}
+      <div className={`${card} p-5 sm:p-7 min-w-0`}>
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2 text-sm mb-4">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-raised px-2 py-1">
+            <span className="grid place-items-center size-4 rounded bg-brand text-brand-ink text-[9px] font-bold uppercase">
+              {space.name.slice(0, 1)}
+            </span>
+            <span className="font-medium">{space.name}</span>
+          </span>
+          <ChevronRight className="size-3.5 text-ink-faint" />
+          <button
+            className="font-mono text-ink-dim hover:text-brand transition-colors select-all"
+            title="Copy task ref"
+            onClick={() => task.ref && navigator.clipboard?.writeText(task.ref)}
+          >
+            {task.ref ?? `#${task.id}`}
+          </button>
+        </div>
+
+        {/* title */}
+        {editingTitle ? (
+          <input
+            autoFocus
+            className="w-full text-2xl font-semibold bg-transparent border-b border-brand focus:outline-none pb-0.5"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveTitle()
+              if (e.key === 'Escape') { setTitle(task.title); setEditingTitle(false) }
+            }}
+          />
+        ) : (
+          <h1
+            className="text-2xl font-semibold cursor-text leading-snug"
+            onClick={() => setEditingTitle(true)}
+            title="Click to edit"
+          >
+            {task.title}
+          </h1>
+        )}
+        {task.blocked && <div className="mt-2"><BlockedTag /></div>}
+
+        {/* description — always-editable live-preview section, no box */}
+        <section className="mt-3 -ml-3">
+          <MarkdownEditor bare value={desc} onChange={setDesc} onBlur={saveDesc} minRows={3}
+                          placeholder="Add a description…" />
+        </section>
+
+        {/* meta controls — same shape as the New Task modal */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-line">
+          <Field label="Status">
+            <Pick value={task.status} onChange={(v) => set({ status: v })}
+                  options={taskStatuses.map((s) => ({ value: s.key, label: s.label }))} />
+          </Field>
+          <Field label="Priority">
+            <Pick value={task.priority} onChange={(v) => set({ priority: v })} options={PRIO_OPTS} />
+          </Field>
+          <Field label="Assignee">
+            <Pick
+              value={task.assignee_id != null ? String(task.assignee_id) : 'none'}
+              onChange={(v) => set({ assignee_id: v === 'none' ? null : Number(v) })}
+              options={[
+                { value: 'none', label: 'Unassigned' },
+                ...(users.data?.filter((u) => u.is_active)
+                  .map((u) => ({ value: String(u.id), label: u.username })) ?? []),
+              ]}
+            />
+          </Field>
+          <Field label="Sprint">
+            <Pick
+              value={task.sprint_id != null ? String(task.sprint_id) : 'none'}
+              onChange={(v) => set({ sprint_id: v === 'none' ? null : Number(v) })}
+              options={[
+                { value: 'none', label: 'Backlog' },
+                ...(sprints.data?.map((s) => ({
+                  value: String(s.id),
+                  label: `${s.name}${s.is_current ? ' · current' : ''}`,
+                })) ?? []),
+              ]}
+            />
+          </Field>
+          <Field label="Project">
+            <Pick
+              value={task.project_id != null ? String(task.project_id) : 'none'}
+              onChange={(v) => set({ project_id: v === 'none' ? null : Number(v) })}
+              options={[
+                { value: 'none', label: '—' },
+                ...(projects.data?.map((p) => ({ value: String(p.id), label: p.title })) ?? []),
+              ]}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-4">
+          <Blockers task={task} />
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-line flex justify-center">
+          <button
+            className="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-danger transition-colors"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-4" /> Delete task
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------------------------------------------- right: activity */}
+      <aside className="min-w-0">
+        <div className={`${card} p-4 flex flex-col max-h-[calc(100vh-3rem)] lg:sticky lg:top-6`}>
+          <Feed parentType="task" parentId={task.id} comments={task.comments} activity={task.activity} />
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+function Blockers({ task }: { task: TaskDetail }) {
+  const { space } = useSpace()
+  const blocker = useBlockerMutation()
+  const [adding, setAdding] = useState(false)
+  const candidates = useTasks({ space_id: space.id }, { enabled: adding })
+
+  return (
+    <div className="space-y-2">
+      <Field label="Blocked by">
+        <div className="space-y-1">
+          {task.blockers.map((b) => (
+            <div key={b.id} className="flex items-center gap-1 group">
+              <TaskLink task={b} />
+              <button
+                className="text-ink-faint hover:text-danger opacity-0 group-hover:opacity-100 text-sm"
+                onClick={() => blocker.mutate({ taskId: task.id, blockerId: b.id, remove: true })}
+                title="Remove blocker"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {adding ? (
+            <Pick
+              value={null}
+              placeholder="Pick a task…"
+              onChange={(v) => {
+                blocker.mutate({ taskId: task.id, blockerId: Number(v) })
+                setAdding(false)
+              }}
+              options={(candidates.data ?? [])
+                .filter((t) => t.id !== task.id && !task.blockers.some((b) => b.id === t.id))
+                .map((t) => ({ value: String(t.id), label: `#${t.id} ${t.title}` }))}
+            />
+          ) : (
+            <button className="text-xs text-ink-faint hover:text-ink transition-colors" onClick={() => setAdding(true)}>
+              + add blocker
+            </button>
+          )}
+        </div>
+      </Field>
+      {task.blocking.length > 0 && (
+        <Field label="Blocks">
+          <div className="space-y-1">
+            {task.blocking.map((b) => <div key={b.id}><TaskLink task={b} /></div>)}
+          </div>
+        </Field>
+      )}
+    </div>
+  )
+}
