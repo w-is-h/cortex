@@ -6,7 +6,7 @@ import type { Activity, Comment } from '../api/types'
 import { Markdown } from './Markdown'
 import { MarkdownEditor } from './MarkdownEditor'
 import { useSpace } from './Shell'
-import { Avatar, Button, timeAgo } from './ui'
+import { Avatar, timeAgo } from './ui'
 
 const EMOJI = ['👍', '👎', '❤️', '🎉', '😄', '🚀', '👀']
 
@@ -46,7 +46,7 @@ export function Feed({
       <h2 className="font-mono text-[11px] font-medium uppercase tracking-wider text-ink-dim mb-3 shrink-0">
         Activity
       </h2>
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
         {entries.map((entry) =>
           entry.comment ? (
             <CommentCard
@@ -74,11 +74,6 @@ export function Feed({
           placeholder="Leave a comment… (@mention to notify)"
           onSubmit={submit}
         />
-        <div className="flex justify-end mt-2">
-          <Button kind="primary" disabled={!draft.trim() || mutations.create.isPending} onClick={submit}>
-            Comment
-          </Button>
-        </div>
       </div>
     </div>
   )
@@ -101,8 +96,8 @@ function CommentCard({
   const who = (ids: number[]) =>
     ids.map((id) => users.data?.find((u) => u.id === id)?.username ?? '…').join(', ')
   return (
-    <div className="group border border-line rounded-lg bg-panel">
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line">
+    <div className="group">
+      <div className="flex items-center gap-2">
         <Avatar name={comment.author_username} size={18} />
         <span className="text-sm font-medium">{comment.author_username}</span>
         <span className="text-xs text-ink-faint font-mono">{timeAgo(comment.created_at)}</span>
@@ -149,22 +144,17 @@ function CommentCard({
           </button>
         )}
       </div>
-      <div className="px-3 py-2">
+      <div className="pl-6.5 pt-0.5">
         {editing ? (
-          <>
-            <MarkdownEditor value={draft} onChange={setDraft} autoFocus minRows={2} />
-            <div className="flex justify-end gap-2 mt-2">
-              <Button kind="ghost" onClick={() => setEditing(false)}>Cancel</Button>
-              <Button kind="primary" disabled={!draft.trim()}
-                      onClick={() => { onEdit(draft); setEditing(false) }}>Save</Button>
-            </div>
-          </>
+          <MarkdownEditor value={draft} onChange={setDraft} autoFocus minRows={2}
+                          onSubmit={() => { if (draft.trim()) { onEdit(draft); setEditing(false) } }}
+                          onEscape={() => setEditing(false)} />
         ) : (
           <Markdown>{comment.body}</Markdown>
         )}
       </div>
       {comment.reactions.length > 0 && (
-        <div className="flex gap-1 px-3 pb-2 flex-wrap">
+        <div className="flex gap-1 pl-6.5 pt-1 flex-wrap">
           {comment.reactions.map((r) => {
             const mine = r.user_ids.includes(myId)
             return (

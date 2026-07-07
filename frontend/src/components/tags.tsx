@@ -61,7 +61,7 @@ export function TagsEditor({ tags, vocab, onChange }: {
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1.5 min-h-9 rounded-md border border-line bg-panel px-2 py-1.5 cursor-text"
+        className="flex flex-wrap items-center gap-1.5 min-h-8 py-1 cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((t) => (

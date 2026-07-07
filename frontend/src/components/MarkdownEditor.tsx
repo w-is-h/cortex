@@ -9,6 +9,7 @@ export type MarkdownEditorProps = {
   onChange: (v: string) => void
   onBlur?: () => void
   onSubmit?: () => void
+  onEscape?: () => void
   placeholder?: string
   minRows?: number
   autoFocus?: boolean
@@ -17,7 +18,7 @@ export type MarkdownEditorProps = {
 /** Plain-markdown textarea: auto-grows, pasted or dropped images upload and
  *  insert as markdown. Enter submits when onSubmit is set (Shift+Enter = newline). */
 export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?: boolean }) {
-  const { value, onChange, onBlur, onSubmit, placeholder, minRows = 4, autoFocus } = props
+  const { value, onChange, onBlur, onSubmit, onEscape, placeholder, minRows = 4, autoFocus } = props
   const ref = useRef<HTMLTextAreaElement>(null)
 
   const autoGrow = () => {
@@ -63,6 +64,7 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
       }}
       onKeyDown={(e) => {
         if (onSubmit && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit() }
+        if (onEscape && e.key === 'Escape') onEscape()
       }}
     />
   )
@@ -100,7 +102,7 @@ export function DescriptionEditor({ value, onSave, placeholder = 'Add a descript
   if (editing) {
     return (
       <div>
-        <div className="border border-line-strong rounded-lg bg-panel px-3 py-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+        <div className="rounded-md bg-raised/60 px-3 py-2">
           <MarkdownEditor bare value={draft} onChange={setDraft} onBlur={save}
                           autoFocus placeholder={placeholder} />
         </div>
