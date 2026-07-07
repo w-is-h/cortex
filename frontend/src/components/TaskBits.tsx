@@ -1,5 +1,6 @@
+import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import { Check, CircleSlash, UserRound } from 'lucide-react'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -176,44 +177,69 @@ export function TaskTable({
   const { list: statuses, doneKeys } = useStatusDefs('task')
   const projects = useProjects(space.id, true)
   const users = useUsers()
+  const update = useUpdateTask()
 
-  if (!tasks.length) return <div className="text-sm text-ink-faint py-8 text-center">No tasks.</div>
+  // group definitions: order, header, and the patch to apply when a task is dropped in
+  type Group = { key: string; header: ReactNode; patch: Partial<Task>; tasks: Task[] }
+  const defs = useMemo<Group[]>(() => {
+    if (groupBy === 'status') {
+      const by: Record<string, Task[]> = {}
+      for (const s of statuses) by[s.key] = []
+      for (const t of tasks) (by[t.status] ??= []).push(t)
+      return statuses.filter((s) => (by[s.key] ?? []).length).map((s) => ({
+        key: s.key, tasks: by[s.key], patch: { status: s.key },
+        header: (<><span className="w-1 h-3.5 rounded-full" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></>),
+      }))
+    }
+    if (groupBy === 'project') {
+      const by = new Map<number | null, Task[]>()
+      for (const t of tasks) { if (!by.has(t.project_id)) by.set(t.project_id, []); by.get(t.project_id)!.push(t) }
+      const out: Group[] = (projects.data ?? []).filter((p) => by.has(p.id)).map((p) => ({
+        key: `p${p.id}`, tasks: by.get(p.id)!, patch: { project_id: p.id },
+        header: (<><span className="w-2 h-2 rounded-full" style={{ background: `hsl(${(p.id * 137.508) % 360} 70% 60%)` }} /><span className="text-sm font-semibold truncate">{p.title}</span></>),
+      }))
+      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: { project_id: null }, header: <span className="text-sm font-semibold text-ink-dim">No project</span> })
+      return out
+    }
+    if (groupBy === 'user') {
+      const by = new Map<number | null, Task[]>()
+      for (const t of tasks) { if (!by.has(t.assignee_id)) by.set(t.assignee_id, []); by.get(t.assignee_id)!.push(t) }
+      const out: Group[] = (users.data ?? []).filter((u) => by.has(u.id)).map((u) => ({
+        key: `u${u.id}`, tasks: by.get(u.id)!, patch: { assignee_id: u.id },
+        header: (<><Avatar name={u.username} size={18} /><span className="text-sm font-semibold">{u.username}</span></>),
+      }))
+      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: { assignee_id: null }, header: <span className="text-sm font-semibold text-ink-dim">Unassigned</span> })
+      return out
+    }
+    return []
+  }, [tasks, groupBy, statuses, projects.data, users.data])
 
-  type Group = { key: string; header: ReactNode; tasks: Task[] }
-  let groups: Group[] = []
-  if (groupBy === 'status') {
-    const by: Record<string, Task[]> = {}
-    for (const s of statuses) by[s.key] = []
-    for (const t of tasks) (by[t.status] ??= []).push(t)
-    groups = statuses.filter((s) => (by[s.key] ?? []).length).map((s) => ({
-      key: s.key, tasks: by[s.key],
-      header: (<><span className="w-1 h-3.5 rounded-full" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></>),
-    }))
-  } else if (groupBy === 'project') {
-    const by = new Map<number | null, Task[]>()
-    for (const t of tasks) { if (!by.has(t.project_id)) by.set(t.project_id, []); by.get(t.project_id)!.push(t) }
-    groups = (projects.data ?? []).filter((p) => by.has(p.id)).map((p) => ({
-      key: `p${p.id}`, tasks: by.get(p.id)!,
-      header: (<><span className="w-2 h-2 rounded-full" style={{ background: `hsl(${(p.id * 137.508) % 360} 70% 60%)` }} /><span className="text-sm font-semibold truncate">{p.title}</span></>),
-    }))
-    if (by.has(null)) groups.push({ key: 'none', tasks: by.get(null)!, header: <span className="text-sm font-semibold text-ink-dim">No project</span> })
-  } else if (groupBy === 'user') {
-    const by = new Map<number | null, Task[]>()
-    for (const t of tasks) { if (!by.has(t.assignee_id)) by.set(t.assignee_id, []); by.get(t.assignee_id)!.push(t) }
-    groups = (users.data ?? []).filter((u) => by.has(u.id)).map((u) => ({
-      key: `u${u.id}`, tasks: by.get(u.id)!,
-      header: (<><Avatar name={u.username} size={18} /><span className="text-sm font-semibold">{u.username}</span></>),
-    }))
-    if (by.has(null)) groups.push({ key: 'none', tasks: by.get(null)!, header: <span className="text-sm font-semibold text-ink-dim">Unassigned</span> })
-  }
+  // local column state so drag-to-another-group feels instant (see board DnD note)
+  const [cols, setCols] = useState<Record<string, Task[]>>({})
+  useEffect(() => {
+    setCols(Object.fromEntries(defs.map((d) => [d.key, d.tasks])))
+  }, [defs])
 
-  // visual order for range selection (grouped view follows the group order)
-  const orderedIds = (groupBy ? groups.flatMap((g) => g.tasks) : tasks).map((t) => t.id)
+  const orderedIds = (groupBy ? defs.flatMap((d) => cols[d.key] ?? d.tasks) : tasks).map((t) => t.id)
   const selecting = !!selection && selection.selected.size > 0
 
-  const row = (task: Task) => (
+  const onDragEnd = ({ source, destination }: DropResult) => {
+    if (!destination || source.droppableId === destination.droppableId) return
+    const from = source.droppableId
+    const to = destination.droppableId
+    const task = cols[from]?.[source.index]
+    const def = defs.find((d) => d.key === to)
+    if (!task || !def) return
+    const next: Record<string, Task[]> = {}
+    for (const k in cols) next[k] = [...cols[k]]
+    next[from].splice(source.index, 1)
+    ;(next[to] ??= []).splice(destination.index, 0, { ...task, ...def.patch })
+    setCols(next)
+    update.mutate({ id: task.id, ...def.patch })
+  }
+
+  const rowContent = (task: Task) => (
     <div
-      key={task.id}
       onClick={(e) => {
         if (selection && e.shiftKey) selection.selectRange(task.id, orderedIds)
         else if (selection && (e.metaKey || e.ctrlKey || selecting)) selection.toggle(task.id)
@@ -225,10 +251,7 @@ export function TaskTable({
     >
       {selection && (
         <span onClick={(e) => e.stopPropagation()} className="grid place-items-center">
-          <Checkbox
-            checked={selection.isSelected(task.id)}
-            onCheckedChange={() => selection.toggle(task.id)}
-          />
+          <Checkbox checked={selection.isSelected(task.id)} onCheckedChange={() => selection.toggle(task.id)} />
         </span>
       )}
       <PrioDot priority={task.priority} />
@@ -249,28 +272,53 @@ export function TaskTable({
     </div>
   )
 
-  const list = (rows: Task[]) => (
-    <div className="border border-line rounded-xl overflow-hidden bg-panel divide-y divide-line">
-      {rows.map(row)}
-    </div>
-  )
+  if (!tasks.length) return <div className="text-sm text-ink-faint py-8 text-center">No tasks.</div>
 
-  if (!groupBy) return list(tasks)
+  if (!groupBy) {
+    return (
+      <div className="border border-line rounded-xl overflow-hidden bg-panel divide-y divide-line">
+        {tasks.map((t) => <div key={t.id}>{rowContent(t)}</div>)}
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-5">
-      {groups.map((g) => (
-        <div key={g.key}>
-          <div className="flex items-center gap-2 px-1 mb-1.5">
-            {g.header}
-            <span className="font-mono text-xs text-ink-faint bg-raised rounded-full px-1.5">
-              {g.tasks.length}
-            </span>
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="space-y-5">
+        {defs.map((d) => (
+          <div key={d.key}>
+            <div className="flex items-center gap-2 px-1 mb-1.5">
+              {d.header}
+              <span className="font-mono text-xs text-ink-faint bg-raised rounded-full px-1.5">
+                {(cols[d.key] ?? d.tasks).length}
+              </span>
+            </div>
+            <Droppable droppableId={d.key}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`rounded-xl border overflow-hidden bg-panel divide-y divide-line transition-colors ${
+                    snapshot.isDraggingOver ? 'border-brand/40' : 'border-line'
+                  }`}
+                >
+                  {(cols[d.key] ?? d.tasks).map((t, i) => (
+                    <Draggable draggableId={String(t.id)} index={i} key={t.id}>
+                      {(p) => (
+                        <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
+                          {rowContent(t)}
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           </div>
-          {list(g.tasks)}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </DragDropContext>
   )
 }
 
