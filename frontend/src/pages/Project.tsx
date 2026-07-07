@@ -1,10 +1,10 @@
 import { Archive, ChevronRight, Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { ProjectDetail } from '../api/types'
 import { Feed } from '../components/Feed'
-import { MarkdownEditor } from '../components/MarkdownEditor'
+import { DescriptionEditor } from '../components/MarkdownEditor'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagsEditor } from '../components/tags'
@@ -35,23 +35,9 @@ function ProjectView({ project }: { project: ProjectDetail }) {
   const [newTask, setNewTask] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(project.title)
-  const [desc, setDesc] = useState(project.description)
 
   useEffect(() => { setTitle(project.title) }, [project.title])
-  useEffect(() => { setDesc(project.description) }, [project.description])
 
-  // Save the description on blur (and unmount), not per keystroke — one activity per edit.
-  const descRef = useRef(desc)
-  const savedRef = useRef(project.description)
-  descRef.current = desc
-  useEffect(() => { savedRef.current = project.description }, [project.description])
-  const saveDesc = () => {
-    if (descRef.current !== savedRef.current) {
-      savedRef.current = descRef.current
-      update.mutate({ id: project.id, description: descRef.current })
-    }
-  }
-  useEffect(() => () => saveDesc(), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveTitle = () => {
     setEditingTitle(false)
@@ -102,10 +88,10 @@ function ProjectView({ project }: { project: ProjectDetail }) {
           </div>
         )}
 
-        {/* description — always-editable live-preview section, no box */}
-        <section className="mt-3 -ml-3">
-          <MarkdownEditor bare value={desc} onChange={setDesc} onBlur={saveDesc} minRows={3}
-                          placeholder="Add a description…" />
+        {/* description — rendered markdown; click to edit, blur/Done saves */}
+        <section className="mt-3">
+          <DescriptionEditor value={project.description}
+                             onSave={(md) => update.mutate({ id: project.id, description: md })} />
         </section>
 
         {/* meta */}

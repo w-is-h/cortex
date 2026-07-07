@@ -1,5 +1,5 @@
 import { ChevronRight, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useBlockerMutation, useDeleteTask, useProjects, useSprints, useTask, useTasks,
@@ -7,7 +7,7 @@ import {
 } from '../api/hooks'
 import type { TaskDetail } from '../api/types'
 import { Feed } from '../components/Feed'
-import { MarkdownEditor } from '../components/MarkdownEditor'
+import { DescriptionEditor } from '../components/MarkdownEditor'
 import { useSpace } from '../components/Shell'
 import { BlockedTag, PRIO_OPTS, TaskLink } from '../components/TaskBits'
 import { useStatusDefs } from '../components/statuses'
@@ -36,24 +36,9 @@ function TaskView({ task }: { task: TaskDetail }) {
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(task.title)
-  const [desc, setDesc] = useState(task.description)
 
   useEffect(() => { setTitle(task.title) }, [task.title])
-  useEffect(() => { setDesc(task.description) }, [task.description])
 
-  // Save the description once, on blur (and on unmount) — not per keystroke — so a
-  // single edit produces one activity entry instead of one per pause.
-  const descRef = useRef(desc)
-  const savedRef = useRef(task.description)
-  descRef.current = desc
-  useEffect(() => { savedRef.current = task.description }, [task.description])
-  const saveDesc = () => {
-    if (descRef.current !== savedRef.current) {
-      savedRef.current = descRef.current
-      update.mutate({ id: task.id, description: descRef.current })
-    }
-  }
-  useEffect(() => () => saveDesc(), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (patch: Record<string, unknown>) => update.mutate({ id: task.id, ...patch })
   const { list: taskStatuses } = useStatusDefs('task')
@@ -121,10 +106,10 @@ function TaskView({ task }: { task: TaskDetail }) {
         )}
         {task.blocked && <div className="mt-2"><BlockedTag /></div>}
 
-        {/* description — always-editable live-preview section, no box */}
-        <section className="mt-3 -ml-3">
-          <MarkdownEditor bare value={desc} onChange={setDesc} onBlur={saveDesc} minRows={3}
-                          placeholder="Add a description…" />
+        {/* description — rendered markdown; click to edit, blur/Done saves */}
+        <section className="mt-3">
+          <DescriptionEditor value={task.description}
+                             onSave={(md) => update.mutate({ id: task.id, description: md })} />
         </section>
 
         {/* meta controls — same shape as the New Task modal */}
