@@ -21,6 +21,9 @@ export function Projects() {
   const [view, setView] = useState<'list' | 'timeline'>(
     () => (localStorage.getItem('cortex.projview') as 'list' | 'timeline') || 'list',
   )
+  const [group, setGroup] = useState<'status' | 'tag'>(
+    () => (localStorage.getItem('cortex.projgroup') as 'status' | 'tag') || 'status',
+  )
   const [creating, setCreating] = useState(false)
   const [tagFilter, setTagFilter] = useState<string[]>([])
 
@@ -51,6 +54,13 @@ export function Projects() {
           <Checkbox checked={showArchived} onCheckedChange={(c) => setShowArchived(c === true)} />
           archived
         </label>
+        {view === 'list' && (
+          <SegmentedToggle
+            value={group}
+            onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}
+            options={[{ value: 'status', label: 'Status' }, { value: 'tag', label: 'Tag' }]}
+          />
+        )}
         <SegmentedToggle
           value={view}
           onChange={(v) => { setView(v); localStorage.setItem('cortex.projview', v) }}
@@ -63,7 +73,7 @@ export function Projects() {
 
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
-        ? <div className="max-w-5xl mx-auto"><List projects={items} onTagClick={toggleTag} /></div>
+        ? <div className="max-w-5xl mx-auto"><List projects={items} groupBy={group} onTagClick={toggleTag} /></div>
         : <Timeline projects={items.filter((p) => p.due_date)} />)}
 
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />
@@ -71,7 +81,11 @@ export function Projects() {
   )
 }
 
-function List({ projects, onTagClick }: { projects: Project[]; onTagClick: (t: string) => void }) {
+function List({ projects, groupBy, onTagClick }: {
+  projects: Project[]
+  groupBy: 'status' | 'tag'
+  onTagClick: (t: string) => void
+}) {
   const users = useUsers()
   const { list: statuses } = useStatusDefs('project')
   const update = useUpdateProject()
@@ -131,6 +145,30 @@ function List({ projects, onTagClick }: { projects: Project[]; onTagClick: (t: s
           </span>
         )}
       </Link>
+    )
+  }
+
+  if (groupBy === 'tag') {
+    // group by first tag; static (dropping into a tag group has no sane meaning)
+    const by = new Map<string | null, Project[]>()
+    for (const p of projects) { const k = p.tags[0] ?? null; if (!by.has(k)) by.set(k, []); by.get(k)!.push(p) }
+    const groups = [...by.keys()].filter((k): k is string => k !== null).sort()
+      .map((tag) => ({ key: tag, header: <TagChip tag={tag} onClick={() => onTagClick(tag)} />, items: by.get(tag)! }))
+    if (by.has(null)) groups.push({ key: '∅', header: <span className="text-sm font-semibold text-ink-dim">No tag</span>, items: by.get(null)! })
+    return (
+      <div className="space-y-5">
+        {groups.map((g) => (
+          <div key={g.key}>
+            <div className="flex items-center gap-2 mb-1.5 px-1">
+              {g.header}
+              <span className="font-mono text-xs text-ink-faint">{g.items.length}</span>
+            </div>
+            <div className="rounded-lg border border-line divide-y divide-line overflow-hidden">
+              {g.items.map((p) => <div key={p.id}>{rowInner(p)}</div>)}
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
 

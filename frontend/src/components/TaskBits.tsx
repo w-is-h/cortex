@@ -12,6 +12,7 @@ import { useCreateTask, useMoveTasks, useProjects, useSprints, useUpdateTask, us
 import type { Priority, Task } from '../api/types'
 import { useSpace } from './Shell'
 import { useStatusDefs } from './statuses'
+import { TagChip } from './tags'
 import {
   Avatar, Button, Field, inputCls, Modal, Pick, PRIORITIES, PrioDot,
 } from './ui'
@@ -169,7 +170,7 @@ export function TaskTable({
   selection?: Selection
   showSprint?: boolean
   showProject?: boolean
-  groupBy?: 'status' | 'project' | 'user'
+  groupBy?: 'status' | 'project' | 'user' | 'tag'
 }) {
   const navigate = useNavigate()
   const { space } = useSpace()
@@ -180,7 +181,8 @@ export function TaskTable({
   const update = useUpdateTask()
 
   // group definitions: order, header, and the patch to apply when a task is dropped in
-  type Group = { key: string; header: ReactNode; patch: Partial<Task>; tasks: Task[] }
+  // patch: applied when a task is dropped into the group; null = not a drop target
+  type Group = { key: string; header: ReactNode; patch: Partial<Task> | null; tasks: Task[] }
   const defs = useMemo<Group[]>(() => {
     if (groupBy === 'status') {
       const by: Record<string, Task[]> = {}
@@ -199,6 +201,18 @@ export function TaskTable({
         header: (<><span className="w-2 h-2 rounded-full" style={{ background: `hsl(${(p.id * 137.508) % 360} 70% 60%)` }} /><span className="text-sm font-semibold truncate">{p.title}</span></>),
       }))
       if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: { project_id: null }, header: <span className="text-sm font-semibold text-ink-dim">No project</span> })
+      return out
+    }
+    if (groupBy === 'tag') {
+      // a task's tag is its project's first tag; dropping here has no sane patch
+      const firstTag = (t: Task) => projects.data?.find((p) => p.id === t.project_id)?.tags[0] ?? null
+      const by = new Map<string | null, Task[]>()
+      for (const t of tasks) { const k = firstTag(t); if (!by.has(k)) by.set(k, []); by.get(k)!.push(t) }
+      const out: Group[] = [...by.keys()].filter((k): k is string => k !== null).sort().map((tag) => ({
+        key: `t${tag}`, tasks: by.get(tag)!, patch: null,
+        header: <TagChip tag={tag} />,
+      }))
+      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: null, header: <span className="text-sm font-semibold text-ink-dim">No tag</span> })
       return out
     }
     if (groupBy === 'user') {
@@ -229,7 +243,7 @@ export function TaskTable({
     const to = destination.droppableId
     const task = cols[from]?.[source.index]
     const def = defs.find((d) => d.key === to)
-    if (!task || !def) return
+    if (!task || !def || !def.patch) return
     const next: Record<string, Task[]> = {}
     for (const k in cols) next[k] = [...cols[k]]
     next[from].splice(source.index, 1)
@@ -293,7 +307,7 @@ export function TaskTable({
                 {(cols[d.key] ?? d.tasks).length}
               </span>
             </div>
-            <Droppable droppableId={d.key}>
+            <Droppable droppableId={d.key} isDropDisabled={!d.patch}>
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}

@@ -4,7 +4,7 @@ import { useSpace } from '../components/Shell'
 import { MoveBar, NewTaskModal, TaskTable, useSelection } from '../components/TaskBits'
 import { Button, SegmentedToggle } from '../components/ui'
 
-type GroupBy = 'none' | 'status' | 'project' | 'user'
+type GroupBy = 'none' | 'status' | 'project' | 'user' | 'tag'
 
 export function Backlog() {
   const { space } = useSpace()
@@ -29,6 +29,7 @@ export function Backlog() {
             { value: 'status', label: 'Status' },
             { value: 'project', label: 'Project' },
             { value: 'user', label: 'User' },
+            { value: 'tag', label: 'Tag' },
           ]}
         />
         {(tasks.data?.length ?? 0) > 1 && (

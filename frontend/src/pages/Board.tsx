@@ -26,6 +26,10 @@ export function Board() {
   const [view, setView] = useState<'kanban' | 'list'>(
     () => (localStorage.getItem('cortex.view') as 'kanban' | 'list') || 'kanban',
   )
+  type ListGroup = 'none' | 'status' | 'project' | 'user' | 'tag'
+  const [listGroup, setListGroup] = useState<ListGroup>(
+    () => (localStorage.getItem('cortex.board.group') as ListGroup) || 'status',
+  )
   const [newTask, setNewTask] = useState<string | null>(null)
   const [newSprint, setNewSprint] = useState(false)
   const selection = useSelection()
@@ -88,6 +92,19 @@ export function Board() {
 
         <div className="flex-1" />
 
+        {view === 'list' && (
+          <SegmentedToggle
+            value={listGroup}
+            onChange={(v) => { setListGroup(v); localStorage.setItem('cortex.board.group', v) }}
+            options={[
+              { value: 'none', label: 'None' },
+              { value: 'status', label: 'Status' },
+              { value: 'project', label: 'Project' },
+              { value: 'user', label: 'User' },
+              { value: 'tag', label: 'Tag' },
+            ]}
+          />
+        )}
         <SegmentedToggle
           value={view}
           onChange={(v) => { setView(v); localStorage.setItem('cortex.view', v) }}
@@ -101,7 +118,8 @@ export function Board() {
       {view === 'kanban' ? (
         <Kanban tasks={tasks.data ?? []} statuses={statuses} selection={selection} onAdd={setNewTask} />
       ) : (
-        <TaskTable tasks={tasks.data ?? []} selection={selection} showProject groupBy="status" />
+        <TaskTable tasks={tasks.data ?? []} selection={selection} showProject={listGroup !== 'project'}
+                   groupBy={listGroup === 'none' ? undefined : listGroup} />
       )}
 
       <MoveBar selection={selection} />
