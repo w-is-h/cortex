@@ -420,6 +420,9 @@ export function NewTaskModal({
   const sprints = useSprints(space.id)
   const projects = useProjects(space.id)
   const { list: taskStatuses } = useStatusDefs('task')
+  const { doneKeys: doneProject } = useStatusDefs('project')
+  // the backend rejects new tasks in a done project, so don't offer them
+  const openProjects = (projects.data ?? []).filter((p) => !doneProject.has(p.status))
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
@@ -495,7 +498,7 @@ export function NewTaskModal({
               value={project || null}
               placeholder="—"
               onChange={setProject}
-              options={projects.data?.map((p) => ({ value: String(p.id), label: p.title })) ?? []}
+              options={openProjects.map((p) => ({ value: String(p.id), label: p.title }))}
             />
           </Field>
         </div>

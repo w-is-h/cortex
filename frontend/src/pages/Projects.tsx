@@ -7,6 +7,7 @@ import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../ap
 import type { Project } from '../api/types'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
+import { TagChip } from '../components/tags'
 import { Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, SegmentedToggle } from '../components/ui'
 
 const DAY = 86_400_000
@@ -21,14 +22,30 @@ export function Projects() {
     () => (localStorage.getItem('cortex.projview') as 'list' | 'timeline') || 'list',
   )
   const [creating, setCreating] = useState(false)
+  const [tagFilter, setTagFilter] = useState<string[]>([])
 
-  const items = projects.data ?? []
+  const all = projects.data ?? []
+  const vocab = useMemo(
+    () => [...new Set((projects.data ?? []).flatMap((p) => p.tags))].sort(),
+    [projects.data],
+  )
+  // AND semantics: every selected tag must be present
+  const items = tagFilter.length ? all.filter((p) => tagFilter.every((t) => p.tags.includes(t))) : all
+  const toggleTag = (t: string) =>
+    setTagFilter((f) => (f.includes(t) ? f.filter((x) => x !== t) : [...f, t]))
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-xl font-bold">Projects</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{items.length}</span>
+        {vocab.length > 0 && (
+          <span className="flex items-center gap-1.5 ml-3">
+            {vocab.map((t) => (
+              <TagChip key={t} tag={t} active={tagFilter.includes(t)} onClick={() => toggleTag(t)} />
+            ))}
+          </span>
+        )}
         <div className="flex-1" />
         <label className="text-xs text-ink-dim flex items-center gap-1.5 mr-2 cursor-pointer">
           <Checkbox checked={showArchived} onCheckedChange={(c) => setShowArchived(c === true)} />
@@ -46,15 +63,15 @@ export function Projects() {
 
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
-        ? <div className="max-w-5xl mx-auto"><List projects={items} /></div>
-        : <Timeline projects={items} />)}
+        ? <div className="max-w-5xl mx-auto"><List projects={items} onTagClick={toggleTag} /></div>
+        : <Timeline projects={items.filter((p) => p.due_date)} />)}
 
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />
     </div>
   )
 }
 
-function List({ projects }: { projects: Project[] }) {
+function List({ projects, onTagClick }: { projects: Project[]; onTagClick: (t: string) => void }) {
   const users = useUsers()
   const { list: statuses } = useStatusDefs('project')
   const update = useUpdateProject()
@@ -84,7 +101,7 @@ function List({ projects }: { projects: Project[] }) {
   }
 
   const rowInner = (p: Project) => {
-    const overdue = ts(p.due_date) < today() && p.open_tasks > 0
+    const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
     const owner = users.data?.find((u) => u.id === p.owner_id)
     return (
@@ -93,8 +110,11 @@ function List({ projects }: { projects: Project[] }) {
         {owner
           ? <Avatar name={owner.username} size={20} />
           : <span className="size-5 shrink-0 rounded-full border border-dashed border-line-strong" title="No owner" />}
-        <span className={`flex-1 text-sm font-medium truncate ${p.archived ? 'text-ink-faint line-through' : ''}`}>
+        <span className={`text-sm font-medium truncate ${p.archived ? 'text-ink-faint line-through' : ''}`}>
           {p.title}
+        </span>
+        <span className="flex-1 flex items-center gap-1 min-w-0">
+          {p.tags.map((t) => <TagChip key={t} tag={t} onClick={() => onTagClick(t)} />)}
         </span>
         {p.total_tasks > 0 && (
           <span className="flex items-center gap-2 text-xs text-ink-dim font-mono">
@@ -105,9 +125,11 @@ function List({ projects }: { projects: Project[] }) {
             </span>
           </span>
         )}
-        <span className={`text-xs font-mono whitespace-nowrap ${overdue ? 'text-prio-urgent font-medium' : 'text-ink-faint'}`}>
-          due {fmtDate(p.due_date)}
-        </span>
+        {p.due_date && (
+          <span className={`text-xs font-mono whitespace-nowrap ${overdue ? 'text-prio-urgent font-medium' : 'text-ink-faint'}`}>
+            due {fmtDate(p.due_date)}
+          </span>
+        )}
       </Link>
     )
   }
@@ -177,8 +199,9 @@ function Timeline({ projects }: { projects: Project[] }) {
   overrideRef.current = override
   const drag = useRef<Drag | null>(null)
 
+  // callers pass only dated projects (due_date filtered upstream)
   const dates = (p: Project) =>
-    override[p.id] ?? { start: ts(p.start_date ?? p.created_at.slice(0, 10)), end: ts(p.due_date) }
+    override[p.id] ?? { start: ts(p.start_date ?? p.created_at.slice(0, 10)), end: ts(p.due_date!) }
 
   // stable vertical order (earliest start first) so bars don't jump after an edit
   const ordered = useMemo(
@@ -202,7 +225,7 @@ function Timeline({ projects }: { projects: Project[] }) {
 
   const { min, baseMax } = useMemo(() => {
     const starts = projects.map((p) => ts(p.start_date ?? p.created_at.slice(0, 10)))
-    const ends = projects.map((p) => ts(p.due_date))
+    const ends = projects.map((p) => ts(p.due_date!))
     return { min: Math.min(...starts, today()) - 7 * DAY, baseMax: Math.max(...ends, today()) + 14 * DAY }
   }, [projects])
 
@@ -348,11 +371,11 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
       <form
         onSubmit={async (e) => {
           e.preventDefault()
-          if (!title.trim() || !due) return
+          if (!title.trim()) return
           await create.mutateAsync({
             space_id: space.id,
             title: title.trim(),
-            due_date: due,
+            due_date: due || undefined,
             start_date: start || undefined,
             owner_id: owner ? Number(owner) : null,
             status: status || undefined,
@@ -368,8 +391,8 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
           <Field label="Starts (optional)">
             <input type="date" className={inputCls} value={start} onChange={(e) => setStart(e.target.value)} />
           </Field>
-          <Field label="Due (required)">
-            <input type="date" required className={inputCls} value={due} onChange={(e) => setDue(e.target.value)} />
+          <Field label="Due (optional for ongoing)">
+            <input type="date" className={inputCls} value={due} onChange={(e) => setDue(e.target.value)} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -392,7 +415,7 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
           </Field>
         </div>
         <div className="flex justify-end">
-          <Button kind="primary" type="submit" disabled={!title.trim() || !due}>Create project</Button>
+          <Button kind="primary" type="submit" disabled={!title.trim()}>Create project</Button>
         </div>
       </form>
     </Modal>

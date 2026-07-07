@@ -96,10 +96,11 @@ export interface Project {
   space_id: number
   title: string
   description: string
-  due_date: string
+  due_date: string | null
   start_date: string | null
   owner_id: number | null
   status: string
+  tags: string[]
   archived: boolean
   created_at: string
   open_tasks: number
@@ -144,7 +145,7 @@ export interface SearchTaskHit {
 export interface SearchProjectHit {
   id: number
   title: string
-  due_date: string
+  due_date: string | null
   space_id: number
   snippet: string
 }

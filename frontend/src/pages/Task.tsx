@@ -57,6 +57,10 @@ function TaskView({ task }: { task: TaskDetail }) {
 
   const set = (patch: Record<string, unknown>) => update.mutate({ id: task.id, ...patch })
   const { list: taskStatuses } = useStatusDefs('task')
+  const { doneKeys: doneProject } = useStatusDefs('project')
+  // done projects reject new tasks (409); keep only the current one selectable
+  const pickableProjects = (projects.data ?? []).filter(
+    (p) => !doneProject.has(p.status) || p.id === task.project_id)
 
   const saveTitle = () => {
     setEditingTitle(false)
@@ -162,7 +166,7 @@ function TaskView({ task }: { task: TaskDetail }) {
               onChange={(v) => set({ project_id: v === 'none' ? null : Number(v) })}
               options={[
                 { value: 'none', label: '—' },
-                ...(projects.data?.map((p) => ({ value: String(p.id), label: p.title })) ?? []),
+                ...pickableProjects.map((p) => ({ value: String(p.id), label: p.title })),
               ]}
             />
           </Field>

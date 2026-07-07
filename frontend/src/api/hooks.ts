@@ -248,7 +248,7 @@ export function useUpdateSpace() {
 export function useCreateProject() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { space_id: number; title: string; due_date: string; description?: string; start_date?: string; owner_id?: number | null; status?: string }) =>
+    mutationFn: (data: { space_id: number; title: string; due_date?: string; description?: string; start_date?: string; owner_id?: number | null; status?: string; tags?: string[] }) =>
       api.post<Project>('/api/projects', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   })

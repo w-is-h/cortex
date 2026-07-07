@@ -1,12 +1,13 @@
 import { Archive, ChevronRight, Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useProject, useUpdateProject, useUsers } from '../api/hooks'
+import { useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { ProjectDetail } from '../api/types'
 import { Feed } from '../components/Feed'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
+import { TagsEditor } from '../components/tags'
 import { NewTaskModal, TaskTable, MoveBar, useSelection } from '../components/TaskBits'
 import { Avatar, Button, Field, inputCls, Pick } from '../components/ui'
 
@@ -26,6 +27,8 @@ function ProjectView({ project }: { project: ProjectDetail }) {
   const { space } = useSpace()
   const update = useUpdateProject()
   const users = useUsers()
+  const siblings = useProjects(space.id, true)
+  const vocab = [...new Set((siblings.data ?? []).flatMap((p) => p.tags))].sort()
   const owner = users.data?.find((u) => u.id === project.owner_id)
   const { list: projStatuses, byKey } = useStatusDefs('project')
   const selection = useSelection()
@@ -130,8 +133,14 @@ function ProjectView({ project }: { project: ProjectDetail }) {
                    onChange={(e) => update.mutate({ id: project.id, start_date: e.target.value || null })} />
           </Field>
           <Field label="Due">
-            <input type="date" className={inputCls} value={project.due_date}
-                   onChange={(e) => e.target.value && update.mutate({ id: project.id, due_date: e.target.value })} />
+            <input type="date" className={inputCls} value={project.due_date ?? ''}
+                   onChange={(e) => update.mutate({ id: project.id, due_date: e.target.value || null })} />
+          </Field>
+        </div>
+        <div className="mt-3">
+          <Field label="Tags">
+            <TagsEditor tags={project.tags} vocab={vocab}
+                        onChange={(tags) => update.mutate({ id: project.id, tags })} />
           </Field>
         </div>
 
