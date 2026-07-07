@@ -95,7 +95,7 @@ function ProjectView({ project }: { project: ProjectDetail }) {
         </section>
 
         {/* meta */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-line">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t-2 border-line-strong">
           <Field label="Status">
             <Pick
               value={project.status}

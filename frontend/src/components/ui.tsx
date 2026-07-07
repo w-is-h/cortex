@@ -29,11 +29,15 @@ export function PrioDot({ priority, className = '' }: { priority: Priority; clas
 }
 
 export function Avatar({ name, size = 20 }: { name: string; size?: number }) {
+  let h = 0
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  const hue = (h * 137.508) % 360
   return (
     <span
       title={name}
-      className="inline-flex items-center justify-center rounded-full bg-brand text-brand-ink font-semibold uppercase shrink-0 select-none"
-      style={{ width: size, height: size, fontSize: size * 0.42 }}
+      className="inline-flex items-center justify-center rounded-full font-semibold uppercase shrink-0 select-none"
+      style={{ width: size, height: size, fontSize: size * 0.42,
+               color: `hsl(${hue} 65% 20%)`, background: `hsl(${hue} 65% 62%)` }}
     >
       {name.slice(0, 2)}
     </span>

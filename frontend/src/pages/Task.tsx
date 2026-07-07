@@ -113,7 +113,7 @@ function TaskView({ task }: { task: TaskDetail }) {
         </section>
 
         {/* meta controls — same shape as the New Task modal */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-line">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t-2 border-line-strong">
           <Field label="Status">
             <Pick value={task.status} onChange={(v) => set({ status: v })}
                   options={taskStatuses.map((s) => ({ value: s.key, label: s.label }))} />

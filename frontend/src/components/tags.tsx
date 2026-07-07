@@ -4,17 +4,26 @@ import { useRef, useState } from 'react'
 /** Mirror of the backend's norm_tags: lowercase, no '#', hyphens for spaces. */
 export const normTag = (s: string) => s.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-')
 
+/** Deterministic hue per tag name (golden-angle over a char hash). */
+const tagHue = (tag: string) => {
+  let h = 0
+  for (const c of tag) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return (h * 137.508) % 360
+}
+
 export function TagChip({ tag, active, onClick, onRemove }: {
   tag: string
   active?: boolean
   onClick?: () => void
   onRemove?: () => void
 }) {
+  const hue = tagHue(tag)
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-px transition-colors ${
-        active ? 'bg-brand text-brand-ink' : 'bg-raised text-ink-dim'
-      } ${onClick ? 'cursor-pointer hover:text-ink' : ''}`}
+      className={`inline-flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-px transition-[filter] ${
+        active ? 'ring-1 ring-current' : ''
+      } ${onClick ? 'cursor-pointer hover:brightness-125' : ''}`}
+      style={{ color: `hsl(${hue} 70% 68%)`, background: `hsl(${hue} 70% 60% / 0.14)` }}
       onClick={onClick && ((e) => { e.preventDefault(); e.stopPropagation(); onClick() })}
     >
       #{tag}

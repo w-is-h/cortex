@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { uploadImage } from '../api/hooks'
 import { Markdown, toggleCheckbox } from './Markdown'
@@ -81,7 +82,7 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
 
 /** Edit-markdown / done / rendered-markdown flow for task & project descriptions.
  *  View mode renders markdown (checkboxes clickable, saved straight through);
- *  click the text to edit; blur or Done saves. */
+ *  the hover pencil opens the editor; blur or Done saves. */
 export function DescriptionEditor({ value, onSave, placeholder = 'Add a description…' }: {
   value: string
   onSave: (md: string) => void
@@ -121,15 +122,14 @@ export function DescriptionEditor({ value, onSave, placeholder = 'Add a descript
   }
 
   return (
-    <div
-      className="cursor-text"
-      title="Click to edit"
-      onClick={(e) => {
-        // links, images and checkboxes act on their own; anything else edits
-        if ((e.target as HTMLElement).closest('a, img, input')) return
-        setEditing(true)
-      }}
-    >
+    <div className="group/desc relative">
+      <button
+        className="absolute right-0 top-0 p-1 rounded-md text-ink-faint hover:text-ink hover:bg-raised opacity-0 group-hover/desc:opacity-100 transition-opacity"
+        title="Edit description"
+        onClick={() => setEditing(true)}
+      >
+        <Pencil className="size-3.5" />
+      </button>
       <Markdown onToggleCheckbox={(i, checked) => onSave(toggleCheckbox(value, i, checked))}>
         {value}
       </Markdown>
