@@ -258,8 +258,9 @@ kbd {
 .prose-cortex blockquote {
   @apply border-l-2 border-line-strong pl-3 text-ink-dim;
 }
+/* images render as small thumbnails; the lightbox (click) shows them full-size */
 .prose-cortex img {
-  @apply rounded-md border border-line max-h-96;
+  @apply rounded-md border border-line max-h-36 max-w-72;
 }
 .prose-cortex table { @apply w-full text-sm; }
 .prose-cortex th { @apply text-left font-medium border-b border-line-strong py-1 pr-4; }

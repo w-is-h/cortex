@@ -1,6 +1,6 @@
-import { Pencil } from 'lucide-react'
+import { Paperclip, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { uploadImage } from '../api/hooks'
+import { uploadFile } from '../api/hooks'
 import { Markdown, toggleCheckbox } from './Markdown'
 import { Button } from './ui'
 
@@ -15,7 +15,45 @@ export type MarkdownEditorProps = {
   autoFocus?: boolean
 }
 
-/** Plain-markdown textarea: auto-grows, pasted or dropped images upload and
+/** Upload files and return the markdown that embeds them: images inline, the rest as links. */
+async function filesToMarkdown(files: FileList): Promise<string> {
+  const parts: string[] = []
+  for (const f of [...files]) {
+    const { url } = await uploadFile(f)
+    parts.push(f.type.startsWith('image/') ? `![${f.name || 'image'}](${url})` : `[${f.name || 'file'}](${url})`)
+  }
+  return parts.join('\n')
+}
+
+/** Paperclip button + hidden file input; mousedown is swallowed so the textarea keeps focus. */
+function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) onFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+      <button
+        type="button"
+        title="Attach files"
+        className="p-1 rounded-md text-ink-faint hover:text-ink hover:bg-raised transition-colors"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => input.current?.click()}
+      >
+        <Paperclip className="size-3.5" />
+      </button>
+    </>
+  )
+}
+
+/** Plain-markdown textarea: auto-grows, pasted/dropped/attached files upload and
  *  insert as markdown. Enter submits when onSubmit is set (Shift+Enter = newline). */
 export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?: boolean }) {
   const { value, onChange, onBlur, onSubmit, onEscape, placeholder, minRows = 4, autoFocus } = props
@@ -35,13 +73,7 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
     onChange(value.slice(0, at) + text + value.slice(at))
   }
 
-  const uploadFiles = async (files: FileList) => {
-    for (const f of [...files]) {
-      if (!f.type.startsWith('image/')) continue
-      const { url } = await uploadImage(f)
-      insertAtCursor(`![${f.name || 'image'}](${url})`)
-    }
-  }
+  const uploadFiles = async (files: FileList) => insertAtCursor(await filesToMarkdown(files))
 
   const textarea = (
     <textarea
@@ -73,11 +105,12 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
   return (
     <div className="border border-line-strong rounded-lg bg-panel overflow-hidden focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
       {textarea}
-      {onSubmit && (
-        <div className="px-2.5 py-1 text-[11px] text-ink-faint text-right border-t border-line select-none">
-          ↵ send · ⇧↵ newline · @mention
-        </div>
-      )}
+      <div className="flex items-center justify-between pl-1.5 pr-2.5 py-0.5 border-t border-line select-none">
+        <AttachButton onFiles={uploadFiles} />
+        {onSubmit && (
+          <div className="text-[11px] text-ink-faint">↵ send · ⇧↵ newline · @mention</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -106,7 +139,11 @@ export function DescriptionEditor({ value, onSave, placeholder = 'Add a descript
           <MarkdownEditor bare value={draft} onChange={setDraft} onBlur={save}
                           autoFocus placeholder={placeholder} />
         </div>
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-end items-center gap-2 mt-2">
+          <AttachButton onFiles={async (files) => {
+            const md = await filesToMarkdown(files)
+            setDraft((d) => (d.trim() ? `${d}\n${md}` : md))
+          }} />
           {/* the textarea's blur fires first and does the save; this is the affordance */}
           <Button kind="primary" onClick={save}>Done</Button>
         </div>

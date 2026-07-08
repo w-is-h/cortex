@@ -1,3 +1,4 @@
+import { Paperclip } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
@@ -70,6 +71,19 @@ export function Markdown({
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeMentions, rehypeCheckboxIndex]}
         components={{
+          a: (props) => {
+            const { node, href, children, ...rest } = props as any
+            // uploaded files get a paperclip and download directly
+            if (typeof href === 'string' && href.startsWith('/api/images/')) {
+              return (
+                <a href={href} download {...rest} onClick={(e) => e.stopPropagation()}>
+                  <Paperclip className="inline size-3.5 mr-1 align-[-2px]" />
+                  {children}
+                </a>
+              )
+            }
+            return <a href={href} {...rest}>{children}</a>
+          },
           img: (props) => {
             const { node, src, ...rest } = props as any
             return (

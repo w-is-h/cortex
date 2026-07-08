@@ -20,5 +20,9 @@ def upload_image(file: UploadFile, user: User = Depends(require_user),
 def get_image(image_id: str, user: User = Depends(require_user),
               db: sqlite3.Connection = Depends(get_db)):
     meta, path = images.get(db, image_id)
-    return FileResponse(path, media_type=meta["content_type"],
-                        headers={"Cache-Control": "private, max-age=31536000, immutable"})
+    headers = {"Cache-Control": "private, max-age=31536000, immutable"}
+    if meta["content_type"] in images.INLINE:
+        return FileResponse(path, media_type=meta["content_type"], headers=headers)
+    # everything else downloads — never rendered by the browser (e.g. HTML, SVG)
+    return FileResponse(path, media_type=meta["content_type"] or "application/octet-stream",
+                        headers=headers, filename=meta["original_name"] or meta["id"])

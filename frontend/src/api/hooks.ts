@@ -333,5 +333,5 @@ export function useApiKeyMutations() {
   return { create, revoke }
 }
 
-export const uploadImage = (file: File | Blob) =>
+export const uploadFile = (file: File | Blob) =>
   api.upload<{ id: string; url: string }>('/api/images', file)
