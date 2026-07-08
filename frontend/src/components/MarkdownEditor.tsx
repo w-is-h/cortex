@@ -25,9 +25,22 @@ async function filesToMarkdown(files: FileList): Promise<string> {
   return parts.join('\n')
 }
 
+/** While the native file dialog is open the window deactivates and Chrome fires
+ *  blur on the focused textarea — save-on-blur must not close the editor behind
+ *  the dialog (the picked file would land on an unmounted input). Only one
+ *  native dialog can be open at a time, so a module flag suffices. */
+let filePickerOpen = false
+
 /** Paperclip button + hidden file input; mousedown is swallowed so the textarea keeps focus. */
 function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
   const input = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    // 'cancel' (dialog dismissed) isn't in React's input types
+    const el = input.current
+    const reset = () => { filePickerOpen = false }
+    el?.addEventListener('cancel', reset)
+    return () => el?.removeEventListener('cancel', reset)
+  }, [])
   return (
     <>
       <input
@@ -36,6 +49,7 @@ function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
         multiple
         hidden
         onChange={(e) => {
+          filePickerOpen = false
           if (e.target.files?.length) onFiles(e.target.files)
           e.target.value = ''
         }}
@@ -45,7 +59,7 @@ function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
         title="Attach files"
         className="p-1 rounded-md text-ink-faint hover:text-ink hover:bg-raised transition-colors"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => input.current?.click()}
+        onClick={() => { filePickerOpen = true; input.current?.click() }}
       >
         <Paperclip className="size-3.5" />
       </button>
@@ -136,7 +150,8 @@ export function DescriptionEditor({ value, onSave, placeholder = 'Add a descript
     return (
       <div>
         <div className="rounded-md bg-raised/60 px-3 py-2">
-          <MarkdownEditor bare value={draft} onChange={setDraft} onBlur={save}
+          <MarkdownEditor bare value={draft} onChange={setDraft}
+                          onBlur={() => { if (!filePickerOpen) save() }}
                           autoFocus placeholder={placeholder} />
         </div>
         <div className="flex justify-end items-center gap-2 mt-2">
