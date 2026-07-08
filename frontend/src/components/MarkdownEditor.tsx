@@ -50,7 +50,7 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
       autoFocus={autoFocus}
       placeholder={placeholder}
       style={{ minHeight: `${minRows * 1.6}em` }}
-      className={`w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-ink-faint ${
+      className={`w-full resize-none bg-transparent text-[1.0625rem] leading-relaxed outline-none placeholder:text-ink-faint ${
         bare ? '' : 'px-3 py-2'
       }`}
       onChange={(e) => onChange(e.target.value)}

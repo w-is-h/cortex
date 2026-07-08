@@ -52,11 +52,10 @@ function NavItem({ to, icon: Icon, label, end }: {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `flex items-center gap-2.5 mx-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors duration-100 ${
-          isActive
-            ? 'bg-brand-soft text-brand'
-            : 'text-ink-dim hover:text-ink hover:bg-raised'
-        }`
+        `flex items-center gap-2.5 px-6 py-2 text-[16px] font-medium border-l-2 transition-colors duration-100 ` +
+        (isActive
+          ? 'bg-[color-mix(in_oklab,var(--color-brand)_7%,transparent)] border-brand text-foreground'
+          : 'text-ink-dim hover:text-ink hover:bg-raised border-transparent')
       }
     >
       <Icon className="size-4 shrink-0 opacity-80" />
@@ -137,7 +136,9 @@ export function Shell() {
         <aside className="w-56 shrink-0 bg-panel border-r border-line flex flex-col">
           <NavLink to="/" className="flex items-center gap-2.5 px-4 h-14 select-none">
             <Logo />
-            <span className="font-semibold tracking-tight text-[1.05rem]">cortex</span>
+            <span className="font-heading font-normal italic text-[1.7rem]">
+              cortex
+            </span>
           </NavLink>
 
           <div className="px-3 pb-2">

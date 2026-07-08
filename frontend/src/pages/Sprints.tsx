@@ -19,7 +19,7 @@ export function Sprints() {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-xl font-bold">Sprints</h1>
+        <h1 className="font-heading font-normal italic text-[1.7rem]">Sprints</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{items.length}</span>
         <div className="flex-1" />
         <Button kind="primary" onClick={() => setCreating(true)}><Plus /> Sprint</Button>
@@ -57,20 +57,21 @@ function SprintList({ sprints }: { sprints: Sprint[] }) {
 
   return (
     <>
-      <div className="border border-line rounded-xl overflow-hidden bg-panel divide-y divide-line">
+      <div className="flex flex-col gap-0.5">
         {sprints.map((s) => (
-          <div key={s.id} className="group flex items-center gap-3 px-3 py-2.5 hover:bg-raised transition-colors">
+          <div
+            key={s.id}
+            onClick={() => open(s)}
+            title="Open this sprint on the board"
+            className="group flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer select-none transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)] hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30"
+          >
             <span
               className="w-1 h-4 rounded-full shrink-0"
               style={{ background: s.is_current ? 'var(--color-brand)' : 'var(--color-ink-faint)' }}
             />
-            <button
-              className={`text-sm font-medium text-left hover:text-brand transition-colors ${s.archived ? 'text-ink-dim' : ''}`}
-              onClick={() => open(s)}
-              title="Open this sprint on the board"
-            >
+            <span className={`text-[1.02rem] font-medium ${s.archived ? 'text-ink-dim' : ''}`}>
               {s.name}
-            </button>
+            </span>
             {s.is_current && (
               <span className="text-[11px] font-semibold text-brand bg-brand-soft rounded-full px-1.5 py-px">current</span>
             )}
@@ -78,17 +79,17 @@ function SprintList({ sprints }: { sprints: Sprint[] }) {
             <span className="text-xs text-ink-faint font-mono whitespace-nowrap">
               {fmtDate(s.start_date)} – {fmtDate(s.end_date)}
             </span>
-            <button title="Edit sprint" onClick={() => setEditing(s)}
+            <button title="Edit sprint" onClick={(e) => { e.stopPropagation(); setEditing(s) }}
                     className="text-ink-faint hover:text-ink p-1 rounded-md hover:bg-raised opacity-0 group-hover:opacity-100 transition-opacity">
               <Pencil className="size-4" />
             </button>
             <button title={s.archived ? 'Unarchive' : 'Archive'}
-                    onClick={() => update.mutate({ id: s.id, archived: !s.archived })}
+                    onClick={(e) => { e.stopPropagation(); update.mutate({ id: s.id, archived: !s.archived }) }}
                     className="text-ink-faint hover:text-ink p-1 rounded-md hover:bg-raised opacity-0 group-hover:opacity-100 transition-opacity">
               {s.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
             </button>
             <button title="Delete sprint"
-                    onClick={() => { if (confirm(`Delete sprint "${s.name}"? Its tasks move to the backlog.`)) del.mutate(s.id) }}
+                    onClick={(e) => { e.stopPropagation(); if (confirm(`Delete sprint "${s.name}"? Its tasks move to the backlog.`)) del.mutate(s.id) }}
                     className="text-ink-faint hover:text-danger p-1 rounded-md hover:bg-raised opacity-0 group-hover:opacity-100 transition-opacity">
               <Trash2 className="size-4" />
             </button>

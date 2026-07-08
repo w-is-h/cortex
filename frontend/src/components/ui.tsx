@@ -46,13 +46,14 @@ export function Avatar({ name, size = 20 }: { name: string; size?: number }) {
 
 const KIND_TO_VARIANT = {
   default: 'outline',
-  primary: 'default',
+  primary: 'brand',
   ghost: 'ghost',
   danger: 'destructive-outline',
 } as const
 
 export function Button({
   children, onClick, kind = 'default', type = 'button', disabled, className = '', title,
+  size = 'default',
 }: {
   children: ReactNode
   onClick?: () => void
@@ -61,6 +62,7 @@ export function Button({
   disabled?: boolean
   className?: string
   title?: string
+  size?: 'default' | 'sm' | 'lg'
 }) {
   const variant = KIND_TO_VARIANT[kind]
   return (
@@ -69,7 +71,7 @@ export function Button({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      size="sm"
+      size={size}
       variant={variant === 'destructive-outline' ? 'outline' : variant}
       className={cn(
         variant === 'destructive-outline' && 'text-danger hover:text-danger hover:border-danger/40',
@@ -177,13 +179,13 @@ export function SegmentedToggle<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <div className="flex bg-raised border border-line rounded-lg p-0.5 text-[0.8rem] font-medium">
+    <div className="flex bg-raised border border-line rounded-lg p-1 h-9 items-center text-[0.85rem] font-medium">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'px-2.5 py-0.5 rounded-md transition-colors',
+            'px-2.5 h-full rounded-md transition-colors',
             value === o.value
               ? 'bg-primary text-primary-foreground shadow-sm shadow-black/10'
               : 'text-ink-dim hover:text-ink',

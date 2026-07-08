@@ -17,13 +17,13 @@ ProjectStatus = Literal["todo", "in_progress", "done"]
 TASK_STATUSES = [
     {"key": "todo", "label": "To do", "color": "#8b949e", "is_done": False},
     {"key": "in_progress", "label": "In progress", "color": "#58a6ff", "is_done": False},
-    {"key": "done", "label": "Done", "color": "#3fb950", "is_done": True},
+    {"key": "done", "label": "Done", "color": "#db6d28", "is_done": True},
 ]
 
 PROJECT_STATUSES = [
     {"key": "todo", "label": "To do", "color": "#8b949e", "is_done": False},
     {"key": "in_progress", "label": "In progress", "color": "#58a6ff", "is_done": False},
-    {"key": "done", "label": "Done", "color": "#3fb950", "is_done": True},
+    {"key": "done", "label": "Done", "color": "#db6d28", "is_done": True},
 ]
 
 TASK_DONE_KEYS = tuple(s["key"] for s in TASK_STATUSES if s["is_done"])

@@ -14,7 +14,7 @@ import { useSpace } from './Shell'
 import { useStatusDefs } from './statuses'
 import { TagChip } from './tags'
 import {
-  Avatar, Button, Field, inputCls, Modal, Pick, PRIORITIES, PrioDot,
+  Avatar, Button, Field, inputCls, Modal, Pick, PRIO_COLOR, PRIORITIES, PrioDot,
 } from './ui'
 
 // ---- selection
@@ -66,7 +66,7 @@ export type Selection = ReturnType<typeof useSelection>
 
 export function BlockedTag() {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-prio-urgent bg-prio-urgent/10 border border-prio-urgent/20 rounded-full px-1.5 py-px">
+    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-prio-urgent bg-prio-urgent/10 border border-prio-urgent/20 rounded-full px-1.5 py-px">
       <CircleSlash className="size-2.5" />
       blocked
     </span>
@@ -83,7 +83,7 @@ export function ProjectChip({ projectId }: { projectId: number | null }) {
     <Link
       to={`/projects/${project.id}`}
       onClick={(e) => e.stopPropagation()}
-      className="text-[11px] font-medium rounded-md px-1.5 py-px truncate max-w-36 hover:brightness-125 transition-[filter]"
+      className="text-[12px] font-medium rounded-md px-1.5 py-px truncate max-w-36 hover:brightness-125 transition-[filter]"
       style={{ color: `hsl(${hue} 70% 72%)`, background: `hsl(${hue} 70% 60% / 0.13)` }}
       title={project.title}
     >
@@ -161,6 +161,57 @@ const PRIO_OPTS = PRIORITIES.map((p) => ({
   ),
 }))
 
+// ---- single row, shared by TaskTable and any other draggable task list (e.g. Home's
+// backlog <-> current-sprint DnD, which needs rows outside a single TaskTable instance)
+
+export function TaskRow({ task, selection, orderedIds, showProject = false, sprintLabel }: {
+  task: Task
+  selection?: Selection
+  orderedIds: number[]
+  showProject?: boolean
+  sprintLabel?: string | null
+}) {
+  const navigate = useNavigate()
+  const { doneKeys } = useStatusDefs('task')
+  const selecting = !!selection && selection.selected.size > 0
+  return (
+    <div
+      onClick={(e) => {
+        if (selection && e.shiftKey) selection.selectRange(task.id, orderedIds)
+        else if (selection && (e.metaKey || e.ctrlKey || selecting)) selection.toggle(task.id)
+        else navigate(`/tasks/${task.id}`)
+      }}
+      className={`group relative flex items-center gap-3 rounded-lg pl-4 pr-3 py-2 cursor-pointer select-none transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)] ${
+        selection?.isSelected(task.id)
+          ? 'bg-brand-soft/60'
+          : 'hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30'
+      }`}
+    >
+      <span
+        aria-hidden
+        className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
+        style={{ background: PRIO_COLOR[task.priority] }}
+      />
+      {selection && (
+        <span onClick={(e) => e.stopPropagation()} className="grid place-items-center">
+          <Checkbox checked={selection.isSelected(task.id)} onCheckedChange={() => selection.toggle(task.id)} />
+        </span>
+      )}
+      <PrioDot priority={task.priority} />
+      <span className={`flex-1 text-[1.02rem] font-medium truncate ${doneKeys.has(task.status) ? 'text-ink-faint' : ''}`}>
+        {task.title}
+      </span>
+      {task.blocked && <BlockedTag />}
+      {showProject && <ProjectChip projectId={task.project_id} />}
+      {sprintLabel != null && (
+        <span className="text-xs text-ink-faint font-mono whitespace-nowrap">{sprintLabel}</span>
+      )}
+      <StatusSelect task={task} />
+      <AssigneeMenu task={task} size={20} />
+    </div>
+  )
+}
+
 // ---- table (list view, backlog, project tasks)
 
 export function TaskTable({
@@ -172,10 +223,9 @@ export function TaskTable({
   showProject?: boolean
   groupBy?: 'status' | 'project' | 'user' | 'tag'
 }) {
-  const navigate = useNavigate()
   const { space } = useSpace()
   const sprints = useSprints(showSprint ? space.id : undefined)
-  const { list: statuses, doneKeys } = useStatusDefs('task')
+  const { list: statuses } = useStatusDefs('task')
   const projects = useProjects(space.id, true)
   const users = useUsers()
   const update = useUpdateTask()
@@ -235,7 +285,6 @@ export function TaskTable({
   }, [defs])
 
   const orderedIds = (groupBy ? defs.flatMap((d) => cols[d.key] ?? d.tasks) : tasks).map((t) => t.id)
-  const selecting = !!selection && selection.selected.size > 0
 
   const onDragEnd = ({ source, destination }: DropResult) => {
     if (!destination || source.droppableId === destination.droppableId) return
@@ -252,45 +301,26 @@ export function TaskTable({
     update.mutate({ id: task.id, ...def.patch })
   }
 
+  const sprintLabel = (task: Task): string | undefined =>
+    showSprint
+      ? (task.sprint_id ? sprints.data?.find((s) => s.id === task.sprint_id)?.name ?? `sprint ${task.sprint_id}` : 'backlog')
+      : undefined
+
   const rowContent = (task: Task) => (
-    <div
-      onClick={(e) => {
-        if (selection && e.shiftKey) selection.selectRange(task.id, orderedIds)
-        else if (selection && (e.metaKey || e.ctrlKey || selecting)) selection.toggle(task.id)
-        else navigate(`/tasks/${task.id}`)
-      }}
-      className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors select-none ${
-        selection?.isSelected(task.id) ? 'bg-brand-soft/50' : 'hover:bg-raised'
-      }`}
-    >
-      {selection && (
-        <span onClick={(e) => e.stopPropagation()} className="grid place-items-center">
-          <Checkbox checked={selection.isSelected(task.id)} onCheckedChange={() => selection.toggle(task.id)} />
-        </span>
-      )}
-      <PrioDot priority={task.priority} />
-      <span className={`flex-1 text-sm font-medium truncate ${doneKeys.has(task.status) ? 'line-through text-ink-faint' : ''}`}>
-        {task.title}
-      </span>
-      {task.blocked && <BlockedTag />}
-      {showProject && <ProjectChip projectId={task.project_id} />}
-      {showSprint && (
-        <span className="text-xs text-ink-faint font-mono whitespace-nowrap">
-          {task.sprint_id
-            ? sprints.data?.find((s) => s.id === task.sprint_id)?.name ?? `sprint ${task.sprint_id}`
-            : 'backlog'}
-        </span>
-      )}
-      <StatusSelect task={task} />
-      <AssigneeMenu task={task} size={20} />
-    </div>
+    <TaskRow
+      task={task}
+      selection={selection}
+      orderedIds={orderedIds}
+      showProject={showProject}
+      sprintLabel={sprintLabel(task)}
+    />
   )
 
   if (!tasks.length) return <div className="text-sm text-ink-faint py-8 text-center">No tasks.</div>
 
   if (!groupBy) {
     return (
-      <div className="border border-line rounded-xl overflow-hidden bg-panel divide-y divide-line">
+      <div className="flex flex-col gap-0.5">
         {tasks.map((t) => <div key={t.id}>{rowContent(t)}</div>)}
       </div>
     )
@@ -298,7 +328,7 @@ export function TaskTable({
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="space-y-5">
+      <div className="space-y-6">
         {defs.map((d) => (
           <div key={d.key}>
             <div className="flex items-center gap-2 px-1 mb-1.5">
@@ -312,8 +342,8 @@ export function TaskTable({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`rounded-xl border overflow-hidden bg-panel divide-y divide-line transition-colors ${
-                    snapshot.isDraggingOver ? 'border-brand/40' : 'border-line'
+                  className={`flex flex-col gap-0.5 rounded-lg transition-colors ${
+                    snapshot.isDraggingOver ? 'bg-brand-soft/30' : ''
                   }`}
                 >
                   {(cols[d.key] ?? d.tasks).map((t, i) => (
@@ -411,7 +441,7 @@ export function MoveBar({ selection }: { selection: Selection }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button kind="ghost" onClick={selection.clear}>Cancel</Button>
+      <Button kind="ghost" size="sm" onClick={selection.clear}>Cancel</Button>
       <style>{`@keyframes rise { from { opacity: 0; transform: translate(-50%, 8px) } to { transform: translate(-50%, 0) } }`}</style>
     </div>
   )
@@ -535,7 +565,7 @@ export function TaskLink({ task }: { task: Task }) {
       className="inline-flex items-center gap-1.5 text-sm hover:text-brand transition-colors"
     >
       <PrioDot priority={task.priority} />
-      <span className={doneKeys.has(task.status) ? 'line-through text-ink-faint' : ''}>{task.title}</span>
+      <span className={doneKeys.has(task.status) ? 'text-ink-faint' : ''}>{task.title}</span>
     </Link>
   )
 }

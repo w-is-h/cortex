@@ -18,7 +18,7 @@ export function Backlog() {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-xl font-bold">Backlog</h1>
+        <h1 className="font-heading font-normal italic text-[1.7rem]">Backlog</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{tasks.data?.length ?? 0}</span>
         <div className="flex-1" />
         <SegmentedToggle

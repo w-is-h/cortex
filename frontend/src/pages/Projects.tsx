@@ -40,7 +40,7 @@ export function Projects() {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-xl font-bold">Projects</h1>
+        <h1 className="font-heading font-normal italic text-[1.7rem]">Projects</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{items.length}</span>
         {vocab.length > 0 && (
           <span className="flex items-center gap-1.5 ml-3">
@@ -118,13 +118,22 @@ function List({ projects, groupBy, onTagClick }: {
     const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
     const owner = users.data?.find((u) => u.id === p.owner_id)
+    const hue = (p.id * 137.508) % 360
     return (
-      <Link to={`/projects/${p.id}`} draggable={false}
-            className="flex items-center gap-3 px-3 py-2.5 bg-panel hover:bg-raised transition-colors">
+      <Link
+        to={`/projects/${p.id}`}
+        draggable={false}
+        className="group relative flex items-center gap-3 rounded-lg pl-4 pr-3 py-2 transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)] hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30"
+      >
+        <span
+          aria-hidden
+          className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
+          style={{ background: `hsl(${hue} 70% 60%)` }}
+        />
         {owner
           ? <Avatar name={owner.username} size={20} />
           : <span className="size-5 shrink-0 rounded-full border border-dashed border-line-strong" title="No owner" />}
-        <span className={`text-sm font-medium truncate ${p.archived ? 'text-ink-faint line-through' : ''}`}>
+        <span className={`text-[1.02rem] font-medium truncate ${p.archived ? 'text-ink-faint' : ''}`}>
           {p.title}
         </span>
         <span className="flex-1 flex items-center gap-1 min-w-0">
@@ -163,7 +172,7 @@ function List({ projects, groupBy, onTagClick }: {
               {g.header}
               <span className="font-mono text-xs text-ink-faint">{g.items.length}</span>
             </div>
-            <div className="rounded-lg border border-line divide-y divide-line overflow-hidden">
+            <div className="flex flex-col gap-0.5">
               {g.items.map((p) => <div key={p.id}>{rowInner(p)}</div>)}
             </div>
           </div>
@@ -186,8 +195,8 @@ function List({ projects, groupBy, onTagClick }: {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`rounded-lg border divide-y divide-line overflow-hidden transition-colors ${
-                    snapshot.isDraggingOver ? 'border-brand/40 bg-brand-soft/10' : 'border-line'
+                  className={`flex flex-col gap-0.5 rounded-lg transition-colors ${
+                    snapshot.isDraggingOver ? 'bg-brand-soft/30' : ''
                   } ${(cols[s.key] ?? []).length ? '' : 'min-h-11 grid place-items-center'}`}
                 >
                   {(cols[s.key] ?? []).map((p, i) => (

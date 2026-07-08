@@ -118,8 +118,10 @@ export function Board() {
       {view === 'kanban' ? (
         <Kanban tasks={tasks.data ?? []} statuses={statuses} selection={selection} onAdd={setNewTask} />
       ) : (
-        <TaskTable tasks={tasks.data ?? []} selection={selection} showProject={listGroup !== 'project'}
-                   groupBy={listGroup === 'none' ? undefined : listGroup} />
+        <div className="max-w-5xl mx-auto">
+          <TaskTable tasks={tasks.data ?? []} selection={selection} showProject={listGroup !== 'project'}
+                     groupBy={listGroup === 'none' ? undefined : listGroup} />
+        </div>
       )}
 
       <MoveBar selection={selection} />
@@ -197,21 +199,30 @@ function Kanban({ tasks, statuses, selection, onAdd }: {
           <Droppable droppableId={status.key} key={status.key}>
             {(provided, snapshot) => (
               <div
-                className={`rounded-2xl border transition-colors flex flex-col h-[calc(100vh-8rem)] flex-1 min-w-[264px] ${
-                  snapshot.isDraggingOver ? 'border-brand/40 bg-brand-soft/20' : 'border-line bg-muted/40'
-                }`}
+                className="rounded-2xl transition-colors flex flex-col h-[calc(100vh-8rem)] flex-1 min-w-[264px]"
+                style={snapshot.isDraggingOver
+                  ? { background: 'color-mix(in oklab, var(--color-brand) 8%, var(--background))' }
+                  : undefined}
               >
-                <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 shrink-0">
+                <div className="flex items-center gap-2 px-1 pt-1 pb-2.5 shrink-0">
                   <span className="w-1 h-3.5 rounded-full" style={{ background: status.color }} />
-                  <span className="text-sm font-semibold">{status.label}</span>
+                  <span className="text-base font-semibold">{status.label}</span>
                   <span className="font-mono text-xs text-ink-faint bg-raised rounded-full px-1.5">
                     {(columns[status.key] ?? []).length}
                   </span>
+                  <span className="flex-1" />
+                  <button
+                    onClick={() => onAdd(status.key)}
+                    title={`Add task in ${status.label}`}
+                    className="grid place-items-center size-7 rounded-lg text-ink-faint hover:text-brand hover:bg-brand-soft transition-colors"
+                  >
+                    <Plus className="size-4" />
+                  </button>
                 </div>
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex-1 min-h-0 overflow-y-auto px-2 space-y-2"
+                  className="flex-1 min-h-0 overflow-y-auto px-1 space-y-2"
                 >
                   {(columns[status.key] ?? []).map((task, index) => (
                     <Draggable draggableId={String(task.id)} index={index} key={task.id}>
@@ -225,13 +236,6 @@ function Kanban({ tasks, statuses, selection, onAdd }: {
                   ))}
                   {provided.placeholder}
                 </div>
-                <button
-                  onClick={() => onAdd(status.key)}
-                  className="m-2 shrink-0 rounded-xl border border-dashed border-line text-ink-faint hover:text-ink-dim hover:border-line-strong transition-colors py-1.5 grid place-items-center"
-                  title={`Add task in ${status.label}`}
-                >
-                  <Plus className="size-4" />
-                </button>
               </div>
             )}
           </Droppable>
@@ -272,12 +276,12 @@ function Card({ task, selection, dragging, orderedIds, done }: {
         else if (e.metaKey || e.ctrlKey || selecting) selection.toggle(task.id)
         else navigate(`/tasks/${task.id}`)
       }}
-      className={`group relative bg-panel border rounded-2xl px-3 py-2.5 cursor-pointer select-none
-        transition-[box-shadow,border-color] duration-100
-        ${selected ? 'border-brand ring-2 ring-brand-soft' : 'border-line hover:border-line-strong'}
+      className={`group relative bg-card border rounded-2xl px-3 py-2.5 cursor-pointer select-none
+        transition-all duration-150
+        ${selected ? 'border-brand ring-2 ring-brand-soft' : 'border-line/70 hover:border-line-strong'}
         ${dragging
-          ? 'shadow-lg shadow-black/10 dark:shadow-black/40 border-line-strong'
-          : 'hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20'}`}
+          ? 'shadow-lg shadow-black/10 dark:shadow-black/40 border-line-strong scale-[1.02]'
+          : 'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/8 dark:hover:shadow-black/30'}`}
       style={{ borderLeftWidth: 3, borderLeftColor: PRIO_COLOR[task.priority] }}
       title={selecting ? 'Click to toggle selection' : '⌘-click to select'}
     >
@@ -292,7 +296,7 @@ function Card({ task, selection, dragging, orderedIds, done }: {
 
       {task.blocked && <div className="mb-1.5"><BlockedTag /></div>}
 
-      <div className={`text-sm font-medium leading-snug pr-5 ${done ? 'line-through text-ink-faint' : ''}`}>
+      <div className={`text-[0.98rem] font-medium leading-snug pr-5 ${done ? 'text-ink-faint' : ''}`}>
         {task.title}
       </div>
       {preview && (

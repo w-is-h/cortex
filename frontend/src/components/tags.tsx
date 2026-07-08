@@ -20,7 +20,7 @@ export function TagChip({ tag, active, onClick, onRemove }: {
   const hue = tagHue(tag)
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-px transition-[filter] ${
+      className={`inline-flex items-center gap-1 text-[12px] font-medium rounded-md px-1.5 py-px transition-[filter] ${
         active ? 'ring-1 ring-current' : ''
       } ${onClick ? 'cursor-pointer hover:brightness-125' : ''}`}
       style={{ color: `hsl(${hue} 70% 68%)`, background: `hsl(${hue} 70% 60% / 0.14)` }}

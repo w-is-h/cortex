@@ -20,9 +20,6 @@ export function ProjectPage() {
   return <ProjectView project={project.data} />
 }
 
-/** Soft card mirroring the task view. */
-const card = 'bg-card border border-line rounded-2xl shadow-sm shadow-black/5 dark:shadow-none'
-
 function ProjectView({ project }: { project: ProjectDetail }) {
   const { space } = useSpace()
   const update = useUpdateProject()
@@ -46,9 +43,9 @@ function ProjectView({ project }: { project: ProjectDetail }) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(440px,1fr)] gap-6">
-      {/* ---------------------------------------------------- main card */}
-      <div className={`${card} p-5 sm:p-7 min-w-0`}>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_600px] gap-8">
+      {/* ---------------------------------------------------- main */}
+      <div className="min-w-0">
         {/* breadcrumb */}
         <div className="flex items-center gap-2 text-sm mb-4">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-raised px-2 py-1">
@@ -77,7 +74,7 @@ function ProjectView({ project }: { project: ProjectDetail }) {
         ) : (
           <div className="flex items-center gap-2.5">
             <h1
-              className={`flex-1 text-2xl font-semibold cursor-text leading-snug ${project.archived ? 'line-through text-ink-faint' : ''}`}
+              className={`flex-1 text-2xl font-semibold cursor-text leading-snug ${project.archived ? 'text-ink-faint' : ''}`}
               onClick={() => setEditingTitle(true)}
               title="Click to edit"
             >
@@ -156,8 +153,8 @@ function ProjectView({ project }: { project: ProjectDetail }) {
       </div>
 
       {/* ---------------------------------------------------- right: activity */}
-      <aside className="min-w-0">
-        <div className={`${card} p-4 flex flex-col max-h-[calc(100vh-3rem)] lg:sticky lg:top-6`}>
+      <aside className="min-w-0 lg:border-l lg:border-line lg:pl-8">
+        <div className="flex flex-col max-h-[calc(100vh-3rem)] lg:sticky lg:top-6">
           <Feed parentType="project" parentId={project.id} comments={project.comments} />
         </div>
       </aside>

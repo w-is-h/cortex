@@ -46,7 +46,7 @@ export function Login() {
           <button
             type="submit"
             disabled={!username.trim() || login.isPending}
-            className="w-full h-10 bg-brand text-brand-ink font-semibold text-sm rounded-lg hover:bg-brand/90 transition-colors disabled:opacity-40 shadow-lg shadow-brand/10"
+            className="w-full h-11 bg-brand text-brand-ink font-semibold text-sm rounded-lg hover:bg-brand/90 hover:shadow-xl hover:shadow-brand/20 hover:-translate-y-px active:translate-y-0 transition-all duration-150 disabled:opacity-40 disabled:hover:translate-y-0 shadow-lg shadow-brand/10"
           >
             Sign in
           </button>

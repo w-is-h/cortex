@@ -1,6 +1,6 @@
 import { ChevronRight, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   useBlockerMutation, useDeleteTask, useProjects, useSprints, useTask, useTasks,
   useUpdateTask, useUsers,
@@ -20,10 +20,6 @@ export function TaskPage() {
   if (task.isError || !task.data) return <div className="text-sm text-ink-faint py-10 text-center">Task not found.</div>
   return <TaskView task={task.data} />
 }
-
-/** A soft card that mirrors the New Task modal's styling. */
-const card =
-  'bg-card border border-line rounded-2xl shadow-sm shadow-black/5 dark:shadow-none'
 
 function TaskView({ task }: { task: TaskDetail }) {
   const { space } = useSpace()
@@ -60,10 +56,17 @@ function TaskView({ task }: { task: TaskDetail }) {
     }
   }
 
+  const crumbProject = projects.data?.find((p) => p.id === task.project_id)
+  const crumbSprint = sprints.data?.find((s) => s.id === task.sprint_id)
+  const openSprint = (sprintId: number) => {
+    localStorage.setItem(`cortex.sprint.${space.id}`, String(sprintId))
+    navigate(`/s/${space.id}/board`)
+  }
+
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(440px,1fr)] gap-6">
-      {/* ---------------------------------------------------- main card */}
-      <div className={`${card} p-5 sm:p-7 min-w-0`}>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_600px] gap-8">
+      {/* ---------------------------------------------------- main */}
+      <div className="min-w-0">
         {/* breadcrumb */}
         <div className="flex items-center gap-2 text-sm mb-4">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-raised px-2 py-1">
@@ -72,7 +75,30 @@ function TaskView({ task }: { task: TaskDetail }) {
             </span>
             <span className="font-medium">{space.name}</span>
           </span>
-          <ChevronRight className="size-3.5 text-ink-faint" />
+          {crumbProject && (
+            <>
+              <ChevronRight className="size-3.5 text-ink-faint shrink-0" />
+              <Link
+                to={`/projects/${crumbProject.id}`}
+                className="font-medium text-ink-dim hover:text-brand transition-colors truncate max-w-48"
+              >
+                {crumbProject.title}
+              </Link>
+            </>
+          )}
+          {crumbSprint && (
+            <>
+              <ChevronRight className="size-3.5 text-ink-faint shrink-0" />
+              <button
+                onClick={() => openSprint(crumbSprint.id)}
+                title="Open this sprint on the board"
+                className="font-medium text-ink-dim hover:text-brand transition-colors truncate max-w-40"
+              >
+                {crumbSprint.name}
+              </button>
+            </>
+          )}
+          <ChevronRight className="size-3.5 text-ink-faint shrink-0" />
           <button
             className="font-mono text-ink-dim hover:text-brand transition-colors select-all"
             title="Copy task ref"
@@ -172,8 +198,8 @@ function TaskView({ task }: { task: TaskDetail }) {
       </div>
 
       {/* ---------------------------------------------------- right: activity */}
-      <aside className="min-w-0">
-        <div className={`${card} p-4 flex flex-col max-h-[calc(100vh-3rem)] lg:sticky lg:top-6`}>
+      <aside className="min-w-0 lg:border-l lg:border-line lg:pl-8">
+        <div className="flex flex-col max-h-[calc(100vh-3rem)] lg:sticky lg:top-6">
           <Feed parentType="task" parentId={task.id} comments={task.comments} activity={task.activity} />
         </div>
       </aside>
