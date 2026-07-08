@@ -3,12 +3,16 @@ import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
+import { bucketBy } from '@/lib/utils'
 import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { Project } from '../api/types'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
-import { Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, SegmentedToggle } from '../components/ui'
+import {
+  Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, projectHue,
+  RowAccent, rowCls, rowHoverCls, SegmentedToggle,
+} from '../components/ui'
 
 const DAY = 86_400_000
 const today = () => new Date(new Date().toDateString()).getTime()
@@ -21,8 +25,8 @@ export function Projects() {
   const [view, setView] = useState<'list' | 'timeline'>(
     () => (localStorage.getItem('cortex.projview') as 'list' | 'timeline') || 'list',
   )
-  const [group, setGroup] = useState<'status' | 'tag'>(
-    () => (localStorage.getItem('cortex.projgroup') as 'status' | 'tag') || 'status',
+  const [group, setGroup] = useState<'status' | 'tag' | 'user'>(
+    () => (localStorage.getItem('cortex.projgroup') as 'status' | 'tag' | 'user') || 'status',
   )
   const [creating, setCreating] = useState(false)
   const [tagFilter, setTagFilter] = useState<string[]>([])
@@ -54,13 +58,15 @@ export function Projects() {
           <Checkbox checked={showArchived} onCheckedChange={(c) => setShowArchived(c === true)} />
           archived
         </label>
-        {view === 'list' && (
-          <SegmentedToggle
-            value={group}
-            onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}
-            options={[{ value: 'status', label: 'Status' }, { value: 'tag', label: 'Tag' }]}
-          />
-        )}
+        <SegmentedToggle
+          value={group}
+          onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}
+          options={[
+            { value: 'status', label: 'Status' },
+            { value: 'tag', label: 'Tag' },
+            { value: 'user', label: 'User' },
+          ]}
+        />
         <SegmentedToggle
           value={view}
           onChange={(v) => { setView(v); localStorage.setItem('cortex.projview', v) }}
@@ -74,7 +80,7 @@ export function Projects() {
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
         ? <div className="max-w-5xl mx-auto"><List projects={items} groupBy={group} onTagClick={toggleTag} /></div>
-        : <Timeline projects={items.filter((p) => p.due_date)} />)}
+        : <Timeline projects={items.filter((p) => p.due_date)} groupBy={group} />)}
 
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />
     </div>
@@ -83,7 +89,7 @@ export function Projects() {
 
 function List({ projects, groupBy, onTagClick }: {
   projects: Project[]
-  groupBy: 'status' | 'tag'
+  groupBy: 'status' | 'tag' | 'user'
   onTagClick: (t: string) => void
 }) {
   const users = useUsers()
@@ -118,18 +124,13 @@ function List({ projects, groupBy, onTagClick }: {
     const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
     const owner = users.data?.find((u) => u.id === p.owner_id)
-    const hue = (p.id * 137.508) % 360
     return (
       <Link
         to={`/projects/${p.id}`}
         draggable={false}
-        className="group relative flex items-center gap-3 rounded-lg pl-4 pr-3 py-2 transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)] hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30"
+        className={`${rowCls} ${rowHoverCls} gap-3 pl-4 pr-3 py-2`}
       >
-        <span
-          aria-hidden
-          className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
-          style={{ background: `hsl(${hue} 70% 60%)` }}
-        />
+        <RowAccent color={`hsl(${projectHue(p.id)} 70% 60%)`} />
         {owner
           ? <Avatar name={owner.username} size={20} />
           : <span className="size-5 shrink-0 rounded-full border border-dashed border-line-strong" title="No owner" />}
@@ -157,13 +158,26 @@ function List({ projects, groupBy, onTagClick }: {
     )
   }
 
-  if (groupBy === 'tag') {
-    // group by first tag; static (dropping into a tag group has no sane meaning)
-    const by = new Map<string | null, Project[]>()
-    for (const p of projects) { const k = p.tags[0] ?? null; if (!by.has(k)) by.set(k, []); by.get(k)!.push(p) }
-    const groups = [...by.keys()].filter((k): k is string => k !== null).sort()
-      .map((tag) => ({ key: tag, header: <TagChip tag={tag} onClick={() => onTagClick(tag)} />, items: by.get(tag)! }))
-    if (by.has(null)) groups.push({ key: '∅', header: <span className="text-sm font-semibold text-ink-dim">No tag</span>, items: by.get(null)! })
+  // user and tag grouping are static lists (no drag-into-group semantics)
+  if (groupBy === 'user' || groupBy === 'tag') {
+    const groups = groupBy === 'user'
+      ? bucketBy(projects, (p) => p.owner_id, (users.data ?? []).map((u) => u.id)).map(([id, items]) => {
+          const u = users.data?.find((x) => x.id === id)
+          return {
+            key: u ? `u${u.id}` : 'none',
+            header: u
+              ? (<><Avatar name={u.username} size={18} /><span className="text-sm font-semibold">{u.username}</span></>)
+              : <span className="text-sm font-semibold text-ink-dim">No owner</span>,
+            items,
+          }
+        })
+      : bucketBy(projects, (p) => p.tags[0] ?? null).map(([tag, items]) => ({
+          key: tag ?? 'none',
+          header: tag
+            ? <TagChip tag={tag} onClick={() => onTagClick(tag)} />
+            : <span className="text-sm font-semibold text-ink-dim">No tag</span>,
+          items,
+        }))
     return (
       <div className="space-y-5">
         {groups.map((g) => (
@@ -233,8 +247,15 @@ const isoLocal = (t: number) => {
 type Scale = 'weeks' | 'months'
 type Drag = { id: number; edge: 'start' | 'end'; x: number; s: number; e: number }
 
-function Timeline({ projects }: { projects: Project[] }) {
+const TL_HEADER_H = 24
+const TL_ROW_H = 34
+const TL_GROUP_GAP = 14
+const TL_TOP = 28 // space reserved for the month/week tick labels
+
+function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: 'status' | 'tag' | 'user' }) {
   const update = useUpdateProject()
+  const users = useUsers()
+  const { list: statuses } = useStatusDefs('project')
   const [scale, setScale] = useState<Scale>(
     () => (localStorage.getItem('cortex.tlscale') as Scale) || 'months',
   )
@@ -250,12 +271,49 @@ function Timeline({ projects }: { projects: Project[] }) {
   const dates = (p: Project) =>
     override[p.id] ?? { start: ts(p.start_date ?? p.created_at.slice(0, 10)), end: ts(p.due_date!) }
 
-  // stable vertical order (earliest start first) so bars don't jump after an edit
-  const ordered = useMemo(
-    () => [...projects].sort((a, b) =>
-      ts(a.start_date ?? a.created_at.slice(0, 10)) - ts(b.start_date ?? b.created_at.slice(0, 10)) || a.id - b.id),
-    [projects],
-  )
+  const byStart = (a: Project, b: Project) =>
+    ts(a.start_date ?? a.created_at.slice(0, 10)) - ts(b.start_date ?? b.created_at.slice(0, 10)) || a.id - b.id
+
+  // group into swimlanes (earliest start first within each), then flatten with
+  // computed vertical offsets — a header row per group, a row per project
+  const { rows, headers, totalH } = useMemo(() => {
+    type Bucket = { key: string; label: React.ReactNode; items: Project[] }
+    let buckets: Bucket[]
+    if (groupBy === 'status') {
+      buckets = bucketBy(projects, (p) => p.status, statuses.map((s) => s.key)).map(([key, items]) => {
+        const s = statuses.find((x) => x.key === key)!
+        return { key: s.key, label: <StatusBadge def={s} />, items }
+      })
+    } else if (groupBy === 'tag') {
+      buckets = bucketBy(projects, (p) => p.tags[0] ?? null).map(([tag, items]) => ({
+        key: tag ?? 'none',
+        label: tag ? <TagChip tag={tag} /> : <span className="text-sm font-semibold text-ink-dim">No tag</span>,
+        items,
+      }))
+    } else {
+      buckets = bucketBy(projects, (p) => p.owner_id, (users.data ?? []).map((u) => u.id)).map(([id, items]) => {
+        const u = users.data?.find((x) => x.id === id)
+        return {
+          key: u ? `u${u.id}` : 'none',
+          label: u
+            ? <span className="inline-flex items-center gap-1.5"><Avatar name={u.username} size={16} />{u.username}</span>
+            : <span className="text-sm font-semibold text-ink-dim">No owner</span>,
+          items,
+        }
+      })
+    }
+
+    let y = TL_TOP
+    const rowsOut: { p: Project; top: number }[] = []
+    const headersOut: { key: string; label: React.ReactNode; top: number }[] = []
+    for (const b of buckets) {
+      headersOut.push({ key: b.key, label: b.label, top: y })
+      y += TL_HEADER_H
+      for (const p of [...b.items].sort(byStart)) { rowsOut.push({ p, top: y }); y += TL_ROW_H }
+      y += TL_GROUP_GAP
+    }
+    return { rows: rowsOut, headers: headersOut, totalH: Math.max(y - TL_GROUP_GAP, TL_TOP) }
+  }, [projects, groupBy, statuses, users.data])
 
   // measure the visible width so the timeline always spans at least the screen,
   // showing future months even when projects only occupy a couple of months
@@ -343,8 +401,19 @@ function Timeline({ projects }: { projects: Project[] }) {
           options={[{ value: 'weeks', label: 'Weeks' }, { value: 'months', label: 'Months' }]}
         />
       </div>
-      <div ref={scrollHost} className="p-4 overflow-x-auto">
-        <div className="relative" style={{ width: totalW, minWidth: '100%', height: 28 + projects.length * 34 }}>
+      <div className="flex">
+        {/* sticky group labels — not part of the horizontally-scrolling area */}
+        <div className="w-40 shrink-0 border-r border-line p-4">
+          <div className="relative" style={{ height: totalH }}>
+            {headers.map((h) => (
+              <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
+                {h.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div ref={scrollHost} className="flex-1 p-4 overflow-x-auto">
+        <div className="relative" style={{ width: totalW, minWidth: '100%', height: totalH }}>
           {/* grid */}
           {ticks.map((m) => (
             <div key={m.t} className="absolute top-0 bottom-0" style={{ left: x(m.t) }}>
@@ -360,7 +429,7 @@ function Timeline({ projects }: { projects: Project[] }) {
             <span className="absolute top-0 -translate-x-1/2 -mt-0.5 size-1.5 rounded-full bg-brand" />
           </div>
           {/* bars */}
-          {ordered.map((p, i) => {
+          {rows.map(({ p, top }) => {
             const { start, end } = dates(p)
             const overdue = end < today() && p.open_tasks > 0
             const left = x(start)
@@ -373,7 +442,7 @@ function Timeline({ projects }: { projects: Project[] }) {
                 onDragStart={(e) => e.preventDefault()}
                 className="group absolute h-6 rounded-md flex items-center px-2 text-xs font-medium text-panel truncate hover:brightness-110 transition-[filter]"
                 style={{
-                  top: 28 + i * 34,
+                  top,
                   left,
                   width,
                   background: overdue ? 'var(--color-prio-urgent)' : p.archived ? 'var(--color-ink-faint)' : 'var(--color-brand)',
@@ -396,6 +465,7 @@ function Timeline({ projects }: { projects: Project[] }) {
               </Link>
             )
           })}
+        </div>
         </div>
       </div>
     </div>

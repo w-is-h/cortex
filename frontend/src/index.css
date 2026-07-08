@@ -111,6 +111,15 @@
   --brand-ink: #fffaf0;
   --brand-soft: #b3792a14;
 
+  /* hashed-hue chips (tags, project chips): text stays dark-and-saturated on
+     light backgrounds and light-and-saturated on dark ones, independent of
+     hue — a flat lightness regardless of theme reads fine on blue/purple but
+     loses contrast on green (green is the highest-luminance hue at a given
+     HSL lightness), worse still once background is near-white. */
+  --chip-l: 40%;
+  --chip-s: 75%;
+  --chip-bg-l: 55%;
+
   /* extra accents — used for statuses, categories, highlights (avoid grey-on-white) */
   --accent-purple: #7c3aed;
   --accent-green: #16a34a;
@@ -166,6 +175,10 @@
   --brand: #e2af64;
   --brand-ink: #241a0c;
   --brand-soft: #e2af6414;
+
+  --chip-l: 74%;
+  --chip-s: 70%;
+  --chip-bg-l: 60%;
 
   /* extra accents — brighter for dark bg */
   --accent-purple: #a78bfa;

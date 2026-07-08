@@ -1,15 +1,16 @@
 import { X } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { nameHue } from './ui'
 
 /** Mirror of the backend's norm_tags: lowercase, no '#', hyphens for spaces. */
 export const normTag = (s: string) => s.trim().replace(/^#+/, '').toLowerCase().replace(/\s+/g, '-')
 
-/** Deterministic hue per tag name (golden-angle over a char hash). */
-const tagHue = (tag: string) => {
-  let h = 0
-  for (const c of tag) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  return (h * 137.508) % 360
-}
+/** Hashed-hue chip colors (tags, project chips) — contrast via the theme-scoped
+ *  --chip-* tokens in index.css. */
+export const chipStyle = (hue: number) => ({
+  color: `hsl(${hue} var(--chip-s) var(--chip-l))`,
+  background: `hsl(${hue} 65% var(--chip-bg-l) / 0.16)`,
+})
 
 export function TagChip({ tag, active, onClick, onRemove }: {
   tag: string
@@ -17,13 +18,12 @@ export function TagChip({ tag, active, onClick, onRemove }: {
   onClick?: () => void
   onRemove?: () => void
 }) {
-  const hue = tagHue(tag)
   return (
     <span
       className={`inline-flex items-center gap-1 text-[12px] font-medium rounded-md px-1.5 py-px transition-[filter] ${
         active ? 'ring-1 ring-current' : ''
       } ${onClick ? 'cursor-pointer hover:brightness-125' : ''}`}
-      style={{ color: `hsl(${hue} 70% 68%)`, background: `hsl(${hue} 70% 60% / 0.14)` }}
+      style={chipStyle(nameHue(tag))}
       onClick={onClick && ((e) => { e.preventDefault(); e.stopPropagation(); onClick() })}
     >
       #{tag}

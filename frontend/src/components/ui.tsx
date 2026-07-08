@@ -18,6 +18,33 @@ export const PRIO_COLOR: Record<Priority, string> = {
   urgent: 'var(--color-prio-urgent)',
 }
 
+/** Deterministic golden-angle hues: per project id / per name or tag. */
+export const projectHue = (id: number) => (id * 137.508) % 360
+export const nameHue = (s: string) => {
+  let h = 0
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return (h * 137.508) % 360
+}
+
+// one row language for every list (tasks, projects, sidebar panels): flat with
+// a hairline beneath; hover pops it to a card with a shadow and an accent bar.
+// Callers add their own spacing (gap/padding) and pair rowCls with rowHoverCls
+// unless the row is in a selected state.
+export const rowCls =
+  'group relative flex items-center rounded-lg transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)]'
+export const rowHoverCls =
+  'hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30'
+
+export function RowAccent({ color }: { color: string }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
+      style={{ background: color }}
+    />
+  )
+}
+
 export function PrioDot({ priority, className = '' }: { priority: Priority; className?: string }) {
   return (
     <span
@@ -29,9 +56,7 @@ export function PrioDot({ priority, className = '' }: { priority: Priority; clas
 }
 
 export function Avatar({ name, size = 20 }: { name: string; size?: number }) {
-  let h = 0
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  const hue = (h * 137.508) % 360
+  const hue = nameHue(name)
   return (
     <span
       title={name}

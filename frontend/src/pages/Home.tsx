@@ -5,7 +5,7 @@ import { useMyTasks, useNotifications, useProjects, useSprints, useTasks, useUpd
 import type { Sprint, Task } from '../api/types'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
-import { Avatar, fmtDate, timeAgo } from '../components/ui'
+import { Avatar, fmtDate, projectHue, RowAccent, rowCls, rowHoverCls, timeAgo } from '../components/ui'
 import { MoveBar, TaskRow, TaskTable, useSelection, type Selection } from '../components/TaskBits'
 
 const NOTE: Record<string, string> = {
@@ -213,12 +213,8 @@ function ActiveProjects({ ids }: { ids: Set<number> }) {
           const done = p.total_tasks - p.open_tasks
           return (
             <Link key={p.id} to={`/projects/${p.id}`}
-                  className="group relative flex items-center gap-2 rounded-lg pl-4 pr-2.5 py-2 transition-all duration-150 hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_-4px_rgba(0,0,0,0.12)] dark:hover:shadow-black/30">
-              <span
-                aria-hidden
-                className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
-                style={{ background: `hsl(${(p.id * 137.508) % 360} 70% 60%)` }}
-              />
+                  className={`${rowCls} ${rowHoverCls} gap-2 pl-4 pr-2.5 py-2`}>
+              <RowAccent color={`hsl(${projectHue(p.id)} 70% 60%)`} />
               <span className="flex-1 text-sm font-medium truncate">{p.title}</span>
               {p.total_tasks > 0 && (
                 <span className="text-[11px] font-mono text-ink-faint">{done}/{p.total_tasks}</span>

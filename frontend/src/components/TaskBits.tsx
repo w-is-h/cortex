@@ -10,11 +10,13 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateTask, useMoveTasks, useProjects, useSprints, useUpdateTask, useUsers } from '../api/hooks'
 import type { Priority, Task } from '../api/types'
+import { bucketBy } from '@/lib/utils'
 import { useSpace } from './Shell'
 import { useStatusDefs } from './statuses'
-import { TagChip } from './tags'
+import { chipStyle, TagChip } from './tags'
 import {
   Avatar, Button, Field, inputCls, Modal, Pick, PRIO_COLOR, PRIORITIES, PrioDot,
+  projectHue, RowAccent, rowCls, rowHoverCls,
 } from './ui'
 
 // ---- selection
@@ -78,13 +80,12 @@ export function ProjectChip({ projectId }: { projectId: number | null }) {
   const projects = useProjects(space.id, true)
   const project = projects.data?.find((p) => p.id === projectId)
   if (!project) return null
-  const hue = (project.id * 137.508) % 360
   return (
     <Link
       to={`/projects/${project.id}`}
       onClick={(e) => e.stopPropagation()}
       className="text-[12px] font-medium rounded-md px-1.5 py-px truncate max-w-36 hover:brightness-125 transition-[filter]"
-      style={{ color: `hsl(${hue} 70% 72%)`, background: `hsl(${hue} 70% 60% / 0.13)` }}
+      style={chipStyle(projectHue(project.id))}
       title={project.title}
     >
       {project.title}
@@ -181,17 +182,11 @@ export function TaskRow({ task, selection, orderedIds, showProject = false, spri
         else if (selection && (e.metaKey || e.ctrlKey || selecting)) selection.toggle(task.id)
         else navigate(`/tasks/${task.id}`)
       }}
-      className={`group relative flex items-center gap-3 rounded-lg pl-4 pr-3 py-2 cursor-pointer select-none transition-all duration-150 shadow-[0_1px_0_0_var(--color-line)] ${
-        selection?.isSelected(task.id)
-          ? 'bg-brand-soft/60'
-          : 'hover:bg-card hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-6px_rgba(0,0,0,0.14)] dark:hover:shadow-black/30'
-      }`}
+      className={`${rowCls} ${
+        selection?.isSelected(task.id) ? 'bg-brand-soft/60' : rowHoverCls
+      } gap-3 pl-4 pr-3 py-2 cursor-pointer select-none`}
     >
-      <span
-        aria-hidden
-        className="absolute left-0.5 inset-y-0 my-1 w-[3px] scale-y-0 rounded-full transition-transform duration-150 origin-center group-hover:scale-y-100"
-        style={{ background: PRIO_COLOR[task.priority] }}
-      />
+      <RowAccent color={PRIO_COLOR[task.priority]} />
       {selection && (
         <span onClick={(e) => e.stopPropagation()} className="grid place-items-center">
           <Checkbox checked={selection.isSelected(task.id)} onCheckedChange={() => selection.toggle(task.id)} />
@@ -235,45 +230,42 @@ export function TaskTable({
   type Group = { key: string; header: ReactNode; patch: Partial<Task> | null; tasks: Task[] }
   const defs = useMemo<Group[]>(() => {
     if (groupBy === 'status') {
-      const by: Record<string, Task[]> = {}
-      for (const s of statuses) by[s.key] = []
-      for (const t of tasks) (by[t.status] ??= []).push(t)
-      return statuses.filter((s) => (by[s.key] ?? []).length).map((s) => ({
-        key: s.key, tasks: by[s.key], patch: { status: s.key },
-        header: (<><span className="w-1 h-3.5 rounded-full" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></>),
-      }))
+      return bucketBy(tasks, (t) => t.status, statuses.map((s) => s.key)).map(([key, items]) => {
+        const s = statuses.find((x) => x.key === key)!
+        return {
+          key: s.key, tasks: items, patch: { status: s.key },
+          header: (<><span className="w-1 h-3.5 rounded-full" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></>),
+        }
+      })
     }
     if (groupBy === 'project') {
-      const by = new Map<number | null, Task[]>()
-      for (const t of tasks) { if (!by.has(t.project_id)) by.set(t.project_id, []); by.get(t.project_id)!.push(t) }
-      const out: Group[] = (projects.data ?? []).filter((p) => by.has(p.id)).map((p) => ({
-        key: `p${p.id}`, tasks: by.get(p.id)!, patch: { project_id: p.id },
-        header: (<><span className="w-2 h-2 rounded-full" style={{ background: `hsl(${(p.id * 137.508) % 360} 70% 60%)` }} /><span className="text-sm font-semibold truncate">{p.title}</span></>),
-      }))
-      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: { project_id: null }, header: <span className="text-sm font-semibold text-ink-dim">No project</span> })
-      return out
+      return bucketBy(tasks, (t) => t.project_id, (projects.data ?? []).map((p) => p.id)).map(([id, items]) => {
+        const p = projects.data?.find((x) => x.id === id)
+        return p
+          ? {
+              key: `p${p.id}`, tasks: items, patch: { project_id: p.id },
+              header: (<><span className="w-2 h-2 rounded-full" style={{ background: `hsl(${projectHue(p.id)} 70% 60%)` }} /><span className="text-sm font-semibold truncate">{p.title}</span></>),
+            }
+          : { key: 'none', tasks: items, patch: { project_id: null }, header: <span className="text-sm font-semibold text-ink-dim">No project</span> }
+      })
     }
     if (groupBy === 'tag') {
       // a task's tag is its project's first tag; dropping here has no sane patch
       const firstTag = (t: Task) => projects.data?.find((p) => p.id === t.project_id)?.tags[0] ?? null
-      const by = new Map<string | null, Task[]>()
-      for (const t of tasks) { const k = firstTag(t); if (!by.has(k)) by.set(k, []); by.get(k)!.push(t) }
-      const out: Group[] = [...by.keys()].filter((k): k is string => k !== null).sort().map((tag) => ({
-        key: `t${tag}`, tasks: by.get(tag)!, patch: null,
-        header: <TagChip tag={tag} />,
-      }))
-      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: null, header: <span className="text-sm font-semibold text-ink-dim">No tag</span> })
-      return out
+      return bucketBy(tasks, firstTag).map(([tag, items]) => tag
+        ? { key: `t${tag}`, tasks: items, patch: null, header: <TagChip tag={tag} /> }
+        : { key: 'none', tasks: items, patch: null, header: <span className="text-sm font-semibold text-ink-dim">No tag</span> })
     }
     if (groupBy === 'user') {
-      const by = new Map<number | null, Task[]>()
-      for (const t of tasks) { if (!by.has(t.assignee_id)) by.set(t.assignee_id, []); by.get(t.assignee_id)!.push(t) }
-      const out: Group[] = (users.data ?? []).filter((u) => by.has(u.id)).map((u) => ({
-        key: `u${u.id}`, tasks: by.get(u.id)!, patch: { assignee_id: u.id },
-        header: (<><Avatar name={u.username} size={18} /><span className="text-sm font-semibold">{u.username}</span></>),
-      }))
-      if (by.has(null)) out.push({ key: 'none', tasks: by.get(null)!, patch: { assignee_id: null }, header: <span className="text-sm font-semibold text-ink-dim">Unassigned</span> })
-      return out
+      return bucketBy(tasks, (t) => t.assignee_id, (users.data ?? []).map((u) => u.id)).map(([id, items]) => {
+        const u = users.data?.find((x) => x.id === id)
+        return u
+          ? {
+              key: `u${u.id}`, tasks: items, patch: { assignee_id: u.id },
+              header: (<><Avatar name={u.username} size={18} /><span className="text-sm font-semibold">{u.username}</span></>),
+            }
+          : { key: 'none', tasks: items, patch: { assignee_id: null }, header: <span className="text-sm font-semibold text-ink-dim">Unassigned</span> }
+      })
     }
     return []
   }, [tasks, groupBy, statuses, projects.data, users.data])
