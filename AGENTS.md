@@ -11,7 +11,8 @@ by each user's agent editing their own copy. Five rules keep that working:
 1. **Minimal dependencies.** A dependency earns its place with accumulated
    edge cases (an editor, a drag-and-drop engine), not typing time saved. If
    you use one function from a library, write the function. Current counts:
-   backend 5, frontend 17 runtime — justify any increase.
+   backend 5, frontend 21 runtime (3 of those are self-hosted font asset
+   packages) — justify any increase.
 2. **The schema is the contract.** Personal forks survive core updates iff the
    data model stays stable. Schema changes are appended to `MIGRATIONS` in
    `backend/cortex/migrations.py` (ordered by `PRAGMA user_version`); applied
@@ -27,6 +28,21 @@ by each user's agent editing their own copy. Five rules keep that working:
 5. **No feature checklists.** No config knobs, per-space toggles, or admin CRUD
    for anything a code edit covers. Statuses are the worked example below —
    they used to be a DB table with CRUD; now they're a list in a file.
+
+## Two ways to fork
+
+Decide early which kind of fork you are; the contract weighs differently.
+
+1. **Branch out** (most forks — expect 80–90%): take the code and go. It's
+   your tool now — build what your team needs, your way; the rules above are
+   good taste to borrow, not law. These tools aren't meant to live a hundred
+   years: a fork serves a team for a year or two, and when the company
+   outgrows it you build the next thing, properly, for what you've become.
+2. **Track upstream**: you want to keep receiving core updates from this
+   repo. Then the contract binds — rule 2 above all: keep the schema stable
+   and your changes in the extension points (`statuses.py`, tags,
+   `services/`), or merges stop being cheap and you drift into option 1
+   without choosing it.
 
 ## Map
 
