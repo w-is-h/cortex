@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMyTasks, useNotifications, useProjects, useSprints, useTasks, useUpdateTask } from '../api/hooks'
 import type { Sprint, Task } from '../api/types'
+import { useVisibleByStatus } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { Avatar, fmtDate, projectHue, RowAccent, rowCls, rowHoverCls, timeAgo } from '../components/ui'
@@ -29,15 +30,15 @@ export function Home() {
     [sprintTasks.data],
   )
 
+  const visible = useVisibleByStatus(tasks.data ?? [], 'task')
   const groups = useMemo(() => {
-    const all = tasks.data ?? []
     const currentIds = new Set((sprints.data ?? []).filter((s) => s.is_current).map((s) => s.id))
     return {
-      current: all.filter((t) => t.sprint_id !== null && currentIds.has(t.sprint_id)),
-      older: all.filter((t) => t.sprint_id !== null && !currentIds.has(t.sprint_id)),
-      backlog: all.filter((t) => t.sprint_id === null),
+      current: visible.filter((t) => t.sprint_id !== null && currentIds.has(t.sprint_id)),
+      older: visible.filter((t) => t.sprint_id !== null && !currentIds.has(t.sprint_id)),
+      backlog: visible.filter((t) => t.sprint_id === null),
     }
-  }, [tasks.data, sprints.data])
+  }, [visible, sprints.data])
 
   if (tasks.isPending) return null
   const empty = !tasks.data?.length

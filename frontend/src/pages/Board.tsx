@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useCreateSprint, useSprints, useTasks, useUpdateTask } from '../api/hooks'
 import type { Sprint, StatusDef, Task } from '../api/types'
+import { FilterMenu, useListFilters } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { useStatusDefs } from '../components/statuses'
 import {
@@ -34,6 +35,8 @@ export function Board() {
   const [newSprint, setNewSprint] = useState(false)
   const selection = useSelection()
   const { list: statuses } = useStatusDefs('task')
+  const { showDone } = useListFilters()
+  const columns = statuses.filter((s) => showDone || !s.is_done)
 
   const stored = Number(localStorage.getItem(sprintKey(space.id))) || null
   const wanted = sprintId ?? stored
@@ -92,6 +95,7 @@ export function Board() {
 
         <div className="flex-1" />
 
+        <FilterMenu />
         {view === 'list' && (
           <SegmentedToggle
             value={listGroup}
@@ -116,7 +120,7 @@ export function Board() {
       </div>
 
       {view === 'kanban' ? (
-        <Kanban tasks={tasks.data ?? []} statuses={statuses} selection={selection} onAdd={setNewTask} />
+        <Kanban tasks={tasks.data ?? []} statuses={columns} selection={selection} onAdd={setNewTask} />
       ) : (
         <div className="max-w-5xl mx-auto">
           <TaskTable tasks={tasks.data ?? []} selection={selection} showProject={listGroup !== 'project'}

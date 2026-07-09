@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDeleteSprint, useSprints, useUpdateSprint } from '../api/hooks'
 import type { Sprint } from '../api/types'
+import { FilterMenu, useListFilters } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { Button, Empty, Field, fmtDate, inputCls, Modal } from '../components/ui'
 import { NewSprintModal } from './Board'
@@ -11,6 +12,7 @@ export function Sprints() {
   const { space } = useSpace()
   const sprints = useSprints(space.id)
   const [creating, setCreating] = useState(false)
+  const { showArchived } = useListFilters()
 
   const items = sprints.data ?? []
   const active = items.filter((s) => !s.archived)
@@ -22,13 +24,14 @@ export function Sprints() {
         <h1 className="font-heading font-normal italic text-[1.7rem]">Sprints</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{items.length}</span>
         <div className="flex-1" />
+        <FilterMenu done={false} archived />
         <Button kind="primary" onClick={() => setCreating(true)}><Plus /> Sprint</Button>
       </div>
 
       <div className="max-w-5xl mx-auto">
         {!items.length && <Empty>No sprints in {space.name} yet.</Empty>}
         {active.length > 0 && <SprintList sprints={active} />}
-        {archived.length > 0 && (
+        {showArchived && archived.length > 0 && (
           <>
             <h2 className="font-mono text-[11px] uppercase tracking-wider text-ink-dim mt-6 mb-2">
               Archived · auto after due date + 7 days

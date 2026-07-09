@@ -2,10 +2,10 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-p
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Checkbox } from '@/components/ui/checkbox'
 import { bucketBy } from '@/lib/utils'
 import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { Project } from '../api/types'
+import { FilterMenu, useListFilters, useVisibleByStatus } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
@@ -14,24 +14,26 @@ import {
   RowAccent, rowCls, rowHoverCls, SegmentedToggle,
 } from '../components/ui'
 
+type ProjGroup = 'none' | 'status' | 'tag' | 'user'
+
 const DAY = 86_400_000
 const today = () => new Date(new Date().toDateString()).getTime()
 const ts = (iso: string) => new Date(iso.slice(0, 10) + 'T00:00:00').getTime()
 
 export function Projects() {
   const { space } = useSpace()
-  const [showArchived, setShowArchived] = useState(false)
+  const { showArchived } = useListFilters()
   const projects = useProjects(space.id, showArchived)
   const [view, setView] = useState<'list' | 'timeline'>(
     () => (localStorage.getItem('cortex.projview') as 'list' | 'timeline') || 'list',
   )
-  const [group, setGroup] = useState<'status' | 'tag' | 'user'>(
-    () => (localStorage.getItem('cortex.projgroup') as 'status' | 'tag' | 'user') || 'status',
+  const [group, setGroup] = useState<ProjGroup>(
+    () => (localStorage.getItem('cortex.projgroup') as ProjGroup) || 'status',
   )
   const [creating, setCreating] = useState(false)
   const [tagFilter, setTagFilter] = useState<string[]>([])
 
-  const all = projects.data ?? []
+  const all = useVisibleByStatus(projects.data ?? [], 'project')
   const vocab = useMemo(
     () => [...new Set((projects.data ?? []).flatMap((p) => p.tags))].sort(),
     [projects.data],
@@ -54,14 +56,12 @@ export function Projects() {
           </span>
         )}
         <div className="flex-1" />
-        <label className="text-xs text-ink-dim flex items-center gap-1.5 mr-2 cursor-pointer">
-          <Checkbox checked={showArchived} onCheckedChange={(c) => setShowArchived(c === true)} />
-          archived
-        </label>
+        <FilterMenu archived />
         <SegmentedToggle
           value={group}
           onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}
           options={[
+            { value: 'none', label: 'None' },
             { value: 'status', label: 'Status' },
             { value: 'tag', label: 'Tag' },
             { value: 'user', label: 'User' },
@@ -89,11 +89,13 @@ export function Projects() {
 
 function List({ projects, groupBy, onTagClick }: {
   projects: Project[]
-  groupBy: 'status' | 'tag' | 'user'
+  groupBy: ProjGroup
   onTagClick: (t: string) => void
 }) {
   const users = useUsers()
   const { list: statuses } = useStatusDefs('project')
+  const { showDone } = useListFilters()
+  const sections = statuses.filter((s) => showDone || !s.is_done)
   const update = useUpdateProject()
 
   const group = (ps: Project[]) => {
@@ -158,6 +160,14 @@ function List({ projects, groupBy, onTagClick }: {
     )
   }
 
+  if (groupBy === 'none') {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {projects.map((p) => <div key={p.id}>{rowInner(p)}</div>)}
+      </div>
+    )
+  }
+
   // user and tag grouping are static lists (no drag-into-group semantics)
   if (groupBy === 'user' || groupBy === 'tag') {
     const groups = groupBy === 'user'
@@ -198,7 +208,7 @@ function List({ projects, groupBy, onTagClick }: {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="space-y-5">
-        {statuses.map((s) => (
+        {sections.map((s) => (
           <div key={s.key}>
             <div className="flex items-center gap-2 mb-1.5 px-1">
               <StatusBadge def={s} />
@@ -252,7 +262,7 @@ const TL_ROW_H = 34
 const TL_GROUP_GAP = 14
 const TL_TOP = 28 // space reserved for the month/week tick labels
 
-function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: 'status' | 'tag' | 'user' }) {
+function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGroup }) {
   const update = useUpdateProject()
   const users = useUsers()
   const { list: statuses } = useStatusDefs('project')
@@ -277,9 +287,11 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: 'status
   // group into swimlanes (earliest start first within each), then flatten with
   // computed vertical offsets — a header row per group, a row per project
   const { rows, headers, totalH } = useMemo(() => {
-    type Bucket = { key: string; label: React.ReactNode; items: Project[] }
+    type Bucket = { key: string; label: React.ReactNode | null; items: Project[] }
     let buckets: Bucket[]
-    if (groupBy === 'status') {
+    if (groupBy === 'none') {
+      buckets = [{ key: 'all', label: null, items: projects }]
+    } else if (groupBy === 'status') {
       buckets = bucketBy(projects, (p) => p.status, statuses.map((s) => s.key)).map(([key, items]) => {
         const s = statuses.find((x) => x.key === key)!
         return { key: s.key, label: <StatusBadge def={s} />, items }
@@ -307,8 +319,10 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: 'status
     const rowsOut: { p: Project; top: number }[] = []
     const headersOut: { key: string; label: React.ReactNode; top: number }[] = []
     for (const b of buckets) {
-      headersOut.push({ key: b.key, label: b.label, top: y })
-      y += TL_HEADER_H
+      if (b.label != null) {
+        headersOut.push({ key: b.key, label: b.label, top: y })
+        y += TL_HEADER_H
+      }
       for (const p of [...b.items].sort(byStart)) { rowsOut.push({ p, top: y }); y += TL_ROW_H }
       y += TL_GROUP_GAP
     }
@@ -403,15 +417,17 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: 'status
       </div>
       <div className="flex">
         {/* sticky group labels — not part of the horizontally-scrolling area */}
-        <div className="w-40 shrink-0 border-r border-line p-4">
-          <div className="relative" style={{ height: totalH }}>
-            {headers.map((h) => (
-              <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
-                {h.label}
-              </div>
-            ))}
+        {headers.length > 0 && (
+          <div className="w-40 shrink-0 border-r border-line p-4">
+            <div className="relative" style={{ height: totalH }}>
+              {headers.map((h) => (
+                <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
+                  {h.label}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <div ref={scrollHost} className="flex-1 p-4 overflow-x-auto">
         <div className="relative" style={{ width: totalW, minWidth: '100%', height: totalH }}>
           {/* grid */}

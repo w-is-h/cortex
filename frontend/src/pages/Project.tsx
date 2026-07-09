@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { ProjectDetail } from '../api/types'
 import { Feed } from '../components/Feed'
+import { FilterMenu } from '../components/filters'
 import { DescriptionEditor } from '../components/MarkdownEditor'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
@@ -137,6 +138,7 @@ function ProjectView({ project }: { project: ProjectDetail }) {
               {project.total_tasks - project.open_tasks}/{project.total_tasks} done
             </span>
             <span className="flex-1" />
+            <FilterMenu />
             <Button onClick={() => setNewTask(true)}><Plus /> Task</Button>
           </div>
           <TaskTable tasks={project.tasks} selection={selection} showSprint />

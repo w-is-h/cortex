@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCreateTask, useMoveTasks, useProjects, useSprints, useUpdateTask, useUsers } from '../api/hooks'
 import type { Priority, Task } from '../api/types'
 import { bucketBy } from '@/lib/utils'
+import { useVisibleByStatus } from './filters'
 import { useSpace } from './Shell'
 import { useStatusDefs } from './statuses'
 import { chipStyle, TagChip } from './tags'
@@ -210,7 +211,7 @@ export function TaskRow({ task, selection, orderedIds, showProject = false, spri
 // ---- table (list view, backlog, project tasks)
 
 export function TaskTable({
-  tasks, selection, showSprint = false, showProject = false, groupBy,
+  tasks: allTasks, selection, showSprint = false, showProject = false, groupBy,
 }: {
   tasks: Task[]
   selection?: Selection
@@ -218,6 +219,8 @@ export function TaskTable({
   showProject?: boolean
   groupBy?: 'status' | 'project' | 'user' | 'tag'
 }) {
+  // the global done-filter applies to every task list, so it lives here
+  const tasks = useVisibleByStatus(allTasks, 'task')
   const { space } = useSpace()
   const sprints = useSprints(showSprint ? space.id : undefined)
   const { list: statuses } = useStatusDefs('task')
