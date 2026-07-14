@@ -1,8 +1,8 @@
 import { Paperclip, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { uploadFile } from '../api/hooks'
+import { uploadFile, useUsers } from '../api/hooks'
 import { Markdown, toggleCheckbox } from './Markdown'
-import { Button } from './ui'
+import { Avatar, Button } from './ui'
 
 export type MarkdownEditorProps = {
   value: string
@@ -67,11 +67,66 @@ function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
   )
 }
 
+/** Pixel position of `pos` inside the textarea, via an offscreen mirror div
+ *  that clones the metrics that affect text layout. */
+function caretXY(el: HTMLTextAreaElement, pos: number) {
+  const div = document.createElement('div')
+  const style = getComputedStyle(el)
+  for (const p of [
+    'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'boxSizing',
+  ] as const) div.style[p] = style[p]
+  div.style.position = 'absolute'
+  div.style.visibility = 'hidden'
+  div.style.whiteSpace = 'pre-wrap'
+  div.style.wordWrap = 'break-word'
+  div.style.width = `${el.clientWidth}px`
+  div.textContent = el.value.slice(0, pos)
+  const marker = document.createElement('span')
+  marker.textContent = '​'
+  div.appendChild(marker)
+  document.body.appendChild(div)
+  const xy = { x: marker.offsetLeft, y: marker.offsetTop + marker.offsetHeight - el.scrollTop }
+  div.remove()
+  return xy
+}
+
+type MentionState = { start: number; query: string; x: number; y: number }
+
 /** Plain-markdown textarea: auto-grows, pasted/dropped/attached files upload and
- *  insert as markdown. Enter submits when onSubmit is set (Shift+Enter = newline). */
+ *  insert as markdown, @ pops user autocomplete at the caret.
+ *  Enter submits when onSubmit is set (Shift+Enter = newline). */
 export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?: boolean }) {
   const { value, onChange, onBlur, onSubmit, onEscape, placeholder, minRows = 4, autoFocus } = props
   const ref = useRef<HTMLTextAreaElement>(null)
+  const [mention, setMention] = useState<MentionState | null>(null)
+  const [sel, setSel] = useState(0)
+  const users = useUsers()
+  const matches = mention
+    ? (users.data ?? [])
+        .filter((u) => u.is_active && u.username.toLowerCase().startsWith(mention.query.toLowerCase()))
+        .slice(0, 6)
+    : []
+
+  /** Active when the caret sits right after "@word" at a word boundary. */
+  const updateMention = () => {
+    const el = ref.current
+    if (!el) return
+    const m = /(?:^|\s)@([\w-]*)$/.exec(el.value.slice(0, el.selectionStart))
+    if (!m) { setMention(null); return }
+    const start = el.selectionStart - m[1].length - 1
+    setSel(0)
+    setMention({ start, query: m[1], ...caretXY(el, start) })
+  }
+
+  const acceptMention = (username: string) => {
+    const el = ref.current
+    if (!el || !mention) return
+    const pos = mention.start + username.length + 2
+    onChange(`${value.slice(0, mention.start)}@${username} ${value.slice(el.selectionStart)}`)
+    setMention(null)
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(pos, pos) })
+  }
 
   const autoGrow = () => {
     const el = ref.current
@@ -99,9 +154,10 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
       className={`w-full resize-none bg-transparent text-[1.0625rem] leading-relaxed outline-none placeholder:text-ink-faint ${
         bare ? '' : 'px-3 py-2'
       }`}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => { onChange(e.target.value); updateMention() }}
       onInput={autoGrow}
-      onBlur={onBlur}
+      onClick={updateMention}
+      onBlur={() => { setMention(null); onBlur?.() }}
       onPaste={(e) => {
         if (e.clipboardData?.files.length) { e.preventDefault(); uploadFiles(e.clipboardData.files) }
       }}
@@ -109,16 +165,53 @@ export function MarkdownEditor({ bare, ...props }: MarkdownEditorProps & { bare?
         if (e.dataTransfer?.files.length) { e.preventDefault(); uploadFiles(e.dataTransfer.files) }
       }}
       onKeyDown={(e) => {
+        if (mention && matches.length) {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => (s + 1) % matches.length); return }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => (s + matches.length - 1) % matches.length); return }
+          if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acceptMention(matches[sel].username); return }
+          if (e.key === 'Escape') { e.preventDefault(); setMention(null); return }
+        }
         if (onSubmit && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit() }
         if (onEscape && e.key === 'Escape') onEscape()
       }}
     />
   )
 
-  if (bare) return textarea
-  return (
-    <div className="border border-line-strong rounded-lg bg-panel overflow-hidden focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+  const editor = (
+    <div className="relative">
       {textarea}
+      {mention && matches.length > 0 && (
+        <div
+          className="absolute z-50 min-w-40 rounded-md border border-line bg-panel shadow-md py-1"
+          style={{
+            left: Math.min(mention.x, (ref.current?.clientWidth ?? 320) - 170),
+            top: mention.y + 4,
+          }}
+        >
+          {matches.map((u, i) => (
+            <button
+              key={u.id}
+              type="button"
+              className={`w-full flex items-center gap-2 px-2.5 py-1 text-sm text-left transition-colors ${
+                i === sel ? 'bg-raised text-ink' : 'text-ink-dim'
+              }`}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setSel(i)}
+              onClick={() => acceptMention(u.username)}
+            >
+              <Avatar name={u.username} size={18} />
+              {u.username}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  if (bare) return editor
+  return (
+    <div className="border border-line-strong rounded-lg bg-panel focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+      {editor}
       <div className="flex items-center justify-between pl-1.5 pr-2.5 py-0.5 border-t border-line select-none">
         <AttachButton onFiles={uploadFiles} />
         {onSubmit && (

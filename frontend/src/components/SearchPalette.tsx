@@ -108,11 +108,11 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
             <button
               onClick={() => setImages((v) => !v)}
               title="Only results with images"
-              className={`rounded-full px-2 py-0.5 font-medium transition-colors ${
+              className={`rounded-full px-2 py-0.5 font-medium whitespace-nowrap transition-colors ${
                 images ? 'bg-brand-soft text-brand' : 'text-ink-dim hover:text-ink'
               }`}
             >
-              🖼 images
+              has images
             </button>
             {kind !== 'project' && kind !== 'comment' && (
               <Pick
