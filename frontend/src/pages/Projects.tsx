@@ -450,16 +450,27 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
     const ends = projects.filter((p) => p.due_date).map((p) => ts(p.due_date!))
     const ms = projects.flatMap((p) => p.milestones.map((m) => ts(m.date)))
     return {
-      min: Math.min(...starts, today()) - 7 * DAY,
+      // the window reaches back at most a year, whatever the oldest start
+      min: Math.max(Math.min(...starts, today()) - 7 * DAY, today() - 365 * DAY),
       baseMax: Math.max(...ends, ...ms, today()) + 14 * DAY,
     }
   }, [projects])
 
   const neededDays = hostW > 0 ? Math.ceil((hostW - 32) / pxPerDay) : 0
-  const max = Math.max(baseMax, min + neededDays * DAY)
+  // always show some empty future: 4 months ahead on the months scale, 4 weeks on weeks
+  const futureFloor = today() + (scale === 'weeks' ? 28 : 122) * DAY
+  const max = Math.max(baseMax, futureFloor, min + neededDays * DAY)
 
   const x = (t: number) => ((t - min) / DAY) * pxPerDay
   const totalW = ((max - min) / DAY) * pxPerDay
+
+  // land on today when the timeline opens and whenever the scale changes
+  const scrolledFor = useRef<Scale | null>(null)
+  useEffect(() => {
+    if (!hostW || !scrollHost.current || scrolledFor.current === scale) return
+    scrolledFor.current = scale
+    scrollHost.current.scrollLeft = Math.max(0, x(today()) - hostW * 0.3)
+  }, [scale, hostW, min, pxPerDay]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ticks = useMemo(() => {
     const out: { t: number; label: string; major: boolean }[] = []
@@ -558,12 +569,13 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
           {rows.map(({ p, top }) => {
             const { start, end } = dates(p)
             const overdue = end != null && end < today() && p.open_tasks > 0
-            const left = x(start)
+            const drawStart = Math.max(start, min) // clip to the one-year window
+            const left = x(drawStart)
             // open-ended bars fade out instead of ending; run to today + 2 weeks,
             // or past the last milestone if one is further out
             const lastMs = Math.max(0, ...p.milestones.map((m) => ts(m.date)))
             const drawEnd = end ?? Math.max(today(), start, lastMs) + 14 * DAY
-            const width = Math.max((drawEnd - start) / DAY, 0.5) * pxPerDay + pxPerDay
+            const width = Math.max((drawEnd - drawStart) / DAY, 0.5) * pxPerDay + pxPerDay
             const color = overdue ? 'var(--color-prio-urgent)'
               : p.archived ? 'var(--color-ink-faint)' : 'var(--color-brand)'
             return (
