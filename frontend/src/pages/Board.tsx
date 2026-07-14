@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useCreateSprint, useSprints, useTasks, useUpdateTask } from '../api/hooks'
 import type { Sprint, StatusDef, Task } from '../api/types'
-import { FilterMenu, useListFilters } from '../components/filters'
+import { FilterMenu, useListFilters, useVisibleTasks } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { useStatusDefs } from '../components/statuses'
 import {
@@ -53,6 +53,7 @@ export function Board() {
   }
 
   const tasks = useTasks({ space_id: space.id, sprint_id: sprint?.id }, { enabled: !!sprint })
+  const visible = useVisibleTasks(tasks.data ?? [])
 
   if (sprints.isPending) return null
   if (!sprint)
@@ -120,10 +121,10 @@ export function Board() {
       </div>
 
       {view === 'kanban' ? (
-        <Kanban tasks={tasks.data ?? []} statuses={columns} selection={selection} onAdd={setNewTask} />
+        <Kanban tasks={visible} statuses={columns} selection={selection} onAdd={setNewTask} />
       ) : (
         <div className="max-w-5xl mx-auto">
-          <TaskTable tasks={tasks.data ?? []} selection={selection} showProject={listGroup !== 'project'}
+          <TaskTable tasks={visible} selection={selection} showProject={listGroup !== 'project'}
                      groupBy={listGroup === 'none' ? undefined : listGroup} />
         </div>
       )}
