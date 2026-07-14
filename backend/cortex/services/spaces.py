@@ -1,7 +1,7 @@
 import sqlite3
 
 from ..auth import now
-from ..errors import NotFound
+from ..errors import Conflict, NotFound
 
 
 def list_spaces(db: sqlite3.Connection) -> list[dict]:
@@ -26,3 +26,21 @@ def update(db: sqlite3.Connection, space_id: int, **fields) -> dict:
         if fields.get(key) is not None:
             db.execute(f"UPDATE spaces SET {key} = ? WHERE id = ?", (fields[key], space_id))
     return get(db, space_id)
+
+
+def delete(db: sqlite3.Connection, space_id: int) -> None:
+    """Delete a space and everything in it. Comments are polymorphic (no FK), so they
+    go explicitly; task/project deletes cascade to blocks, activity and notifications."""
+    get(db, space_id)
+    if db.execute("SELECT COUNT(*) FROM spaces").fetchone()[0] == 1:
+        raise Conflict("cannot delete the last space")
+    db.execute("""DELETE FROM comments
+                  WHERE (parent_type = 'task'
+                         AND parent_id IN (SELECT id FROM tasks WHERE space_id = ?))
+                     OR (parent_type = 'project'
+                         AND parent_id IN (SELECT id FROM projects WHERE space_id = ?))""",
+               (space_id, space_id))
+    db.execute("DELETE FROM tasks WHERE space_id = ?", (space_id,))
+    db.execute("DELETE FROM projects WHERE space_id = ?", (space_id,))
+    db.execute("DELETE FROM sprints WHERE space_id = ?", (space_id,))
+    db.execute("DELETE FROM spaces WHERE id = ?", (space_id,))

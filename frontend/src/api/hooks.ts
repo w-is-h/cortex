@@ -245,6 +245,14 @@ export function useUpdateSpace() {
   })
 }
 
+export function useDeleteSpace() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/api/spaces/${id}`),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
 export function useCreateProject() {
   const qc = useQueryClient()
   return useMutation({

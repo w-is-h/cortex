@@ -50,6 +50,26 @@ def test_spaces(admin):
     assert admin.get("/api/spaces").json()[1]["name"] == "Eng"
 
 
+def test_space_delete(admin):
+    # the last space cannot be deleted
+    assert admin.delete("/api/spaces/1").status_code == 409
+    space = admin.post("/api/spaces", json={"name": "Doomed"}).json()
+    sid = space["id"]
+    sprint = make_sprint(admin, space_id=sid)
+    proj = make_project(admin, space_id=sid)
+    t = make_task(admin, space_id=sid, sprint_id=sprint["id"], project_id=proj["id"])
+    admin.post(f"/api/tasks/{t['id']}/comments", json={"body": "xyzzycomment"})
+    keeper = make_task(admin, space_id=1)  # space 1 must be untouched
+    assert admin.delete(f"/api/spaces/{sid}").status_code == 200
+    assert [s["id"] for s in admin.get("/api/spaces").json()] == [1]
+    assert admin.get(f"/api/tasks/{t['id']}").status_code == 404
+    assert admin.get(f"/api/projects/{proj['id']}").status_code == 404
+    assert admin.get("/api/sprints", params={"space_id": sid}).json() == []
+    assert admin.get("/api/search", params={"q": "xyzzycomment"}).json()["comments"] == []
+    assert admin.get(f"/api/tasks/{keeper['id']}").status_code == 200
+    assert admin.delete(f"/api/spaces/{sid}").status_code == 404
+
+
 def test_sprint_crud_and_current(admin):
     s = make_sprint(admin)
     assert s["is_current"] is True

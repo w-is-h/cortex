@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  useApiKeyMutations, useApiKeys, useUpdateSpace, useUserAdmin, useUsers,
+  useApiKeyMutations, useApiKeys, useDeleteSpace, useUpdateSpace, useUserAdmin, useUsers,
 } from '../api/hooks'
 import { useSpace } from '../components/Shell'
 import { Avatar, Button, inputCls, Pick, timeAgo } from '../components/ui'
@@ -19,26 +19,44 @@ export function Admin() {
 }
 
 function SpaceSettings() {
-  const { space } = useSpace()
+  const { space, spaces, setSpaceId } = useSpace()
   const update = useUpdateSpace()
+  const del = useDeleteSpace()
+  const onDelete = async () => {
+    if (!confirm(`Delete space "${space.name}" and everything in it — tasks, projects, sprints, comments? This cannot be undone.`)) return
+    await del.mutateAsync(space.id)
+    const survivor = spaces.find((s) => s.id !== space.id)
+    if (survivor) setSpaceId(survivor.id)
+  }
   return (
     <section>
-      <h1 className="text-base font-semibold mb-3">Space</h1>
-      <div className="flex items-center gap-3 border border-line rounded-lg bg-panel px-3 py-2.5">
-        <span className="text-sm font-medium">Default sprint length</span>
-        <span className="flex-1" />
-        <Pick
-          className="w-36"
-          value={String(space.default_sprint_days)}
-          onChange={(v) => update.mutate({ id: space.id, default_sprint_days: Number(v) })}
-          options={[
-            { value: '7', label: '1 week' },
-            { value: '14', label: '2 weeks' },
-            { value: '21', label: '3 weeks' },
-            { value: '28', label: '4 weeks' },
-          ]}
-        />
+      <h1 className="text-base font-semibold mb-3">Space — {space.name}</h1>
+      <div className="border border-line rounded-lg bg-panel divide-y divide-line">
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <span className="text-sm font-medium">Default sprint length</span>
+          <span className="flex-1" />
+          <Pick
+            className="w-36"
+            value={String(space.default_sprint_days)}
+            onChange={(v) => update.mutate({ id: space.id, default_sprint_days: Number(v) })}
+            options={[
+              { value: '7', label: '1 week' },
+              { value: '14', label: '2 weeks' },
+              { value: '21', label: '3 weeks' },
+              { value: '28', label: '4 weeks' },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <span className="text-sm font-medium">Delete this space</span>
+          <span className="text-xs text-ink-faint">removes all its tasks, projects and sprints</span>
+          <span className="flex-1" />
+          <Button kind="danger" disabled={spaces.length < 2} onClick={onDelete}>Delete</Button>
+        </div>
       </div>
+      {del.isError && (
+        <p className="text-sm text-danger mt-2">{(del.error as Error).message}</p>
+      )}
     </section>
   )
 }
