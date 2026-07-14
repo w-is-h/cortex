@@ -537,18 +537,30 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
         />
       </div>
       <div className="flex">
-        {/* sticky group labels — not part of the horizontally-scrolling area */}
-        {headers.length > 0 && (
-          <div className="w-40 shrink-0 border-r border-line p-4">
-            <div className="relative" style={{ height: totalH }}>
-              {headers.map((h) => (
-                <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
-                  {h.label}
-                </div>
-              ))}
-            </div>
+        {/* sticky name column — group labels and project names live here,
+            not on the bars, so they stay readable while the chart scrolls */}
+        <div className="w-44 shrink-0 border-r border-line p-4">
+          <div className="relative" style={{ height: totalH }}>
+            {headers.map((h) => (
+              <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
+                {h.label}
+              </div>
+            ))}
+            {rows.map(({ p, top }) => (
+              <Link
+                key={p.id}
+                to={`/projects/${p.id}`}
+                title={p.title}
+                className={`absolute left-0 right-2 flex items-center h-6 text-sm font-medium hover:text-brand transition-colors ${
+                  headers.length ? 'pl-2' : ''
+                } ${p.archived ? 'text-ink-faint' : ''}`}
+                style={{ top }}
+              >
+                <span className="truncate">{p.title}</span>
+              </Link>
+            ))}
           </div>
-        )}
+        </div>
         <div ref={scrollHost} className="flex-1 p-4 overflow-x-auto">
         <div className="relative" style={{ width: totalW, minWidth: '100%', height: totalH }}>
           {/* grid */}
@@ -584,7 +596,7 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                 to={`/projects/${p.id}`}
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
-                className="group absolute h-6 rounded-md flex items-center px-2 text-xs font-medium text-panel truncate hover:brightness-110 transition-[filter]"
+                className="group absolute h-6 rounded-md hover:brightness-110 transition-[filter]"
                 style={{
                   top,
                   left,
@@ -602,7 +614,6 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                   className="absolute left-0 inset-y-0 w-2 cursor-ew-resize rounded-l-md opacity-0 group-hover:opacity-100 bg-black/20"
                   title="Drag to change start"
                 />
-                <span className="truncate pointer-events-none">{p.title}</span>
                 {end != null && (
                   <span
                     onMouseDown={(e) => startDrag(e, p, 'end')}
