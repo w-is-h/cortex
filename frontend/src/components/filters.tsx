@@ -1,28 +1,49 @@
 import { ListFilter } from 'lucide-react'
 import { useMemo, useSyncExternalStore } from 'react'
 import {
-  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useUsers } from '../api/hooks'
 import { useStatusDefs } from './statuses'
+import { Avatar } from './ui'
 
 /** Global list filters — one setting, remembered, applied to every list.
  *  A module store (not per-component state) so the header menu and the lists
  *  it filters re-render together. */
 
-const KEY = { done: 'cortex.filter.done', archived: 'cortex.filter.archived' }
+const KEY = {
+  done: 'cortex.filter.done',
+  archived: 'cortex.filter.archived',
+  users: 'cortex.filter.users',
+}
 const read = (key: string, dflt: boolean) => {
   const v = localStorage.getItem(key)
   return v == null ? dflt : v === '1'
 }
+const readIds = (key: string): number[] =>
+  (localStorage.getItem(key) ?? '').split(',').filter(Boolean).map(Number)
 
-let state = { showDone: read(KEY.done, true), showArchived: read(KEY.archived, false) }
+let state = {
+  showDone: read(KEY.done, true),
+  showArchived: read(KEY.archived, false),
+  userIds: readIds(KEY.users),
+}
 const subs = new Set<() => void>()
 
 function set(patch: Partial<typeof state>) {
   state = { ...state, ...patch }
   localStorage.setItem(KEY.done, state.showDone ? '1' : '0')
   localStorage.setItem(KEY.archived, state.showArchived ? '1' : '0')
+  localStorage.setItem(KEY.users, state.userIds.join(','))
   subs.forEach((fn) => fn())
+}
+
+function toggleUser(id: number) {
+  const ids = state.userIds.includes(id)
+    ? state.userIds.filter((u) => u !== id)
+    : [...state.userIds, id]
+  set({ userIds: ids })
 }
 
 export function useListFilters() {
@@ -44,10 +65,33 @@ export function useVisibleByStatus<T extends { status: string }>(
   )
 }
 
+/** Task lists: the status filter plus the people filter (no selection = everyone). */
+export function useVisibleTasks<T extends { status: string; assignee_id: number | null }>(
+  items: T[],
+): T[] {
+  const byStatus = useVisibleByStatus(items, 'task')
+  const { userIds } = useListFilters()
+  return useMemo(
+    () => (userIds.length === 0
+      ? byStatus
+      : byStatus.filter((t) => t.assignee_id != null && userIds.includes(t.assignee_id))),
+    [byStatus, userIds],
+  )
+}
+
 /** Funnel dropdown for the page header; pages opt into the toggles that apply. */
-export function FilterMenu({ done = true, archived = false }: { done?: boolean; archived?: boolean }) {
+export function FilterMenu({ done = true, archived = false, users = false }: {
+  done?: boolean
+  archived?: boolean
+  users?: boolean
+}) {
   const filters = useListFilters()
-  const filtering = (done && !filters.showDone) || (archived && filters.showArchived)
+  const allUsers = useUsers()
+  const active = (allUsers.data ?? []).filter((u) => u.is_active)
+  const filtering =
+    (done && !filters.showDone) ||
+    (archived && filters.showArchived) ||
+    (users && filters.userIds.length > 0)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -74,6 +118,24 @@ export function FilterMenu({ done = true, archived = false }: { done?: boolean; 
           >
             Show archived
           </DropdownMenuCheckboxItem>
+        )}
+        {users && active.length > 0 && (
+          <>
+            {done && <DropdownMenuSeparator />}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>People</DropdownMenuLabel>
+              {active.map((u) => (
+                <DropdownMenuCheckboxItem
+                  key={u.id}
+                  checked={filters.userIds.includes(u.id)}
+                  onCheckedChange={() => toggleUser(u.id)}
+                >
+                  <Avatar name={u.username} size={18} />
+                  {u.username}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

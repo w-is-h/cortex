@@ -95,7 +95,7 @@ export function Board() {
 
         <div className="flex-1" />
 
-        <FilterMenu />
+        <FilterMenu users />
         {view === 'list' && (
           <SegmentedToggle
             value={listGroup}

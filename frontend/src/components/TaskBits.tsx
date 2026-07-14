@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCreateTask, useMoveTasks, useProjects, useSprints, useUpdateTask, useUsers } from '../api/hooks'
 import type { Priority, Task } from '../api/types'
 import { bucketBy } from '@/lib/utils'
-import { useVisibleByStatus } from './filters'
+import { useVisibleTasks } from './filters'
 import { useSpace } from './Shell'
 import { useStatusDefs } from './statuses'
 import { chipStyle, TagChip } from './tags'
@@ -220,7 +220,7 @@ export function TaskTable({
   groupBy?: 'status' | 'project' | 'user' | 'tag'
 }) {
   // the global done-filter applies to every task list, so it lives here
-  const tasks = useVisibleByStatus(allTasks, 'task')
+  const tasks = useVisibleTasks(allTasks)
   const { space } = useSpace()
   const sprints = useSprints(showSprint ? space.id : undefined)
   const { list: statuses } = useStatusDefs('task')

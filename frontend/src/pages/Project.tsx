@@ -138,7 +138,7 @@ function ProjectView({ project }: { project: ProjectDetail }) {
               {project.total_tasks - project.open_tasks}/{project.total_tasks} done
             </span>
             <span className="flex-1" />
-            <FilterMenu />
+            <FilterMenu users />
             <Button onClick={() => setNewTask(true)}><Plus /> Task</Button>
           </div>
           <TaskTable tasks={project.tasks} selection={selection} showSprint />

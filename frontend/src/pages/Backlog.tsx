@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTasks } from '../api/hooks'
-import { FilterMenu, useVisibleByStatus } from '../components/filters'
+import { FilterMenu, useVisibleTasks } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { MoveBar, NewTaskModal, TaskTable, useSelection } from '../components/TaskBits'
 import { Button, SegmentedToggle } from '../components/ui'
@@ -15,7 +15,7 @@ export function Backlog() {
   const [group, setGroup] = useState<GroupBy>(
     () => (localStorage.getItem('cortex.backlog.group') as GroupBy) || 'none',
   )
-  const items = useVisibleByStatus(tasks.data ?? [], 'task')
+  const items = useVisibleTasks(tasks.data ?? [])
 
   return (
     <div>
@@ -23,7 +23,7 @@ export function Backlog() {
         <h1 className="font-heading font-normal italic text-[1.7rem]">Backlog</h1>
         <span className="font-mono text-[11px] text-ink-faint mt-0.5">{items.length}</span>
         <div className="flex-1" />
-        <FilterMenu />
+        <FilterMenu users />
         <SegmentedToggle
           value={group}
           onChange={(v) => { setGroup(v); localStorage.setItem('cortex.backlog.group', v) }}
