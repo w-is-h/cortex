@@ -195,6 +195,26 @@ def update_comment(comment_id: int, body: str) -> dict:
         return comments.update(conn, current_user(), comment_id, body)
 
 
+def delete_comment(comment_id: int) -> dict:
+    """Delete one of your own comments (admins may delete any)."""
+    with db.transaction() as conn:
+        comments.delete(conn, current_user(), comment_id)
+        return {"ok": True}
+
+
+def add_reaction(comment_id: int, emoji: str) -> dict:
+    """React to a comment with an emoji (e.g. '👍'). Idempotent per user+emoji.
+    Returns the comment with its reactions."""
+    with db.transaction() as conn:
+        return comments.add_reaction(conn, current_user(), comment_id, emoji)
+
+
+def remove_reaction(comment_id: int, emoji: str) -> dict:
+    """Remove your reaction from a comment. Returns the comment with its reactions."""
+    with db.transaction() as conn:
+        return comments.remove_reaction(conn, current_user(), comment_id, emoji)
+
+
 def list_projects(space_id: int, include_archived: bool = False,
                   tags: list[str] | None = None) -> list[dict]:
     """List a space's projects with tags, due dates and open/total task counts.
@@ -268,7 +288,8 @@ def list_notifications() -> dict:
 
 TOOLS = [get_workspace, list_sprints, create_sprint, update_sprint,
          list_tasks, get_task, create_task, update_task, delete_task, move_tasks,
-         add_blocker, remove_blocker, add_comment, update_comment,
+         add_blocker, remove_blocker, add_comment, update_comment, delete_comment,
+         add_reaction, remove_reaction,
          list_projects, get_project, create_project, update_project,
          search, list_notifications]
 

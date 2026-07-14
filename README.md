@@ -53,7 +53,7 @@ uv run python scripts/seed.py
 
 ## Agents
 
-Mint an API key in Admin, then connect over **REST** (`Authorization: Bearer ck_…`,
+Mint an API key on your Account page (user menu), then connect over **REST** (`Authorization: Bearer ck_…`,
 OpenAPI at `/docs`) or **MCP** (streamable HTTP at `/mcp`, same key):
 
 ```sh
@@ -62,9 +62,9 @@ claude mcp add --transport http cortex http://localhost:8000/mcp \
 ```
 
 A key acts as its owner, so give an agent its own user if you want its actions
-attributed to it. The MCP surface is 20 tools covering the verbs an agent
+attributed to it. The MCP surface is 23 tools covering the verbs an agent
 performs: tasks (create/update/move/delete, blockers), sprints, projects,
-comments, full-text `search`, notifications, and one `get_workspace` call that
+comments (with reactions), full-text `search`, notifications, and one `get_workspace` call that
 returns who you are plus every id and status key the other tools expect.
 
 ## Contributing

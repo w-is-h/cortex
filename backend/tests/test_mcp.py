@@ -35,6 +35,18 @@ def test_workspace_clear_and_ref(as_admin):
     assert mcp_server.get_task(ref=t["ref"])["id"] == t["id"]
 
 
+def test_comment_lifecycle(as_admin):
+    t = mcp_server.create_task(space_id=1, title="discuss")
+    c = mcp_server.add_comment("task", t["id"], "shipping today")
+
+    reacted = mcp_server.add_reaction(c["id"], "👍")
+    assert reacted["reactions"] == [{"emoji": "👍", "count": 1, "user_ids": [1]}]
+    assert mcp_server.remove_reaction(c["id"], "👍")["reactions"] == []
+
+    assert mcp_server.delete_comment(c["id"]) == {"ok": True}
+    assert mcp_server.get_task(t["id"])["comments"] == []
+
+
 def test_notifications_auto_marked(as_admin, admin):
     bob = make_user(admin, "bob")
     mcp_server.create_task(space_id=1, title="for bob", assignee_id=bob["id"])
