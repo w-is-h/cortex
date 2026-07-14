@@ -35,9 +35,12 @@ export function Backlog() {
             { value: 'tag', label: 'Tag' },
           ]}
         />
-        {items.length > 1 && (
-          <Button onClick={() => selection.setMany(items.map((t) => t.id))}>Select all</Button>
-        )}
+        <Button
+          disabled={items.length < 2}
+          onClick={() => selection.setMany(items.map((t) => t.id))}
+        >
+          Select all
+        </Button>
         <Button kind="primary" onClick={() => setNewTask(true)}>+ Task</Button>
       </div>
       <div className="max-w-5xl mx-auto">
