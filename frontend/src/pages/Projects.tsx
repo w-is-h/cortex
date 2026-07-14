@@ -369,6 +369,8 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
   const [scale, setScale] = useState<Scale>(
     () => (localStorage.getItem('cortex.tlscale') as Scale) || 'months',
   )
+  // hovering a bar highlights its name in the sticky column, and vice versa
+  const [hoverId, setHoverId] = useState<number | null>(null)
   const pxPerDay = scale === 'weeks' ? 20 : 6
 
   // live overrides while dragging a bar edge; committed to the server on release
@@ -551,9 +553,11 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                 key={p.id}
                 to={`/projects/${p.id}`}
                 title={p.title}
+                onMouseEnter={() => setHoverId(p.id)}
+                onMouseLeave={() => setHoverId(null)}
                 className={`absolute left-0 right-2 flex items-center h-6 text-sm font-medium hover:text-brand transition-colors ${
                   headers.length ? 'pl-2' : ''
-                } ${p.archived ? 'text-ink-faint' : ''}`}
+                } ${p.archived ? 'text-ink-faint' : ''} ${hoverId === p.id ? 'text-brand' : ''}`}
                 style={{ top }}
               >
                 <span className="truncate">{p.title}</span>
@@ -596,7 +600,11 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                 to={`/projects/${p.id}`}
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
-                className="group absolute h-6 rounded-md hover:brightness-110 transition-[filter]"
+                onMouseEnter={() => setHoverId(p.id)}
+                onMouseLeave={() => setHoverId(null)}
+                className={`group absolute h-6 rounded-md hover:brightness-110 transition-[filter] ${
+                  hoverId === p.id ? 'brightness-110' : ''
+                }`}
                 style={{
                   top,
                   left,
