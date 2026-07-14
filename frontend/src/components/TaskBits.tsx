@@ -8,7 +8,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Textarea } from '@/components/ui/textarea'
-import { useCreateTask, useMoveTasks, useProjects, useSprints, useUpdateTask, useUsers } from '../api/hooks'
+import { useCreateTask, useDeleteTask, useMoveTasks, useProjects, useSprints, useUpdateTask, useUsers } from '../api/hooks'
 import type { Priority, Task } from '../api/types'
 import { bucketBy } from '@/lib/utils'
 import { useVisibleTasks } from './filters'
@@ -205,8 +205,16 @@ export function TaskRow({ task, selection, orderedIds, showProject = false, spri
     >
       <RowAccent color={PRIO_COLOR[task.priority]} />
       {selection && (
-        <span onClick={(e) => e.stopPropagation()} className="grid place-items-center">
-          <Checkbox checked={selection.isSelected(task.id)} onCheckedChange={() => selection.toggle(task.id)} />
+        <span
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            if (e.shiftKey) selection.selectRange(task.id, orderedIds)
+            else selection.toggle(task.id)
+          }}
+          className="grid place-items-center"
+        >
+          <Checkbox checked={selection.isSelected(task.id)} />
         </span>
       )}
       <PrioDot priority={task.priority} />
@@ -379,17 +387,13 @@ export function TaskTable({
 
 // ---- floating move bar
 
-export function MoveBar({ selection }: { selection: Selection }) {
-  const { space } = useSpace()
-  const sprints = useSprints(space.id)
-  const users = useUsers()
-  const move = useMoveTasks()
-  const update = useUpdateTask()
+/** Floating bulk-action bar shown while a selection is live; actions go in children. */
+export function ActionBar({ selection, children }: {
+  selection: Selection
+  children: React.ReactNode
+}) {
   const count = selection.selected.size
   if (count === 0) return null
-
-  const ids = [...selection.selected]
-
   return (
     <div
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-popover border border-line-strong rounded-xl shadow-xl shadow-black/40 flex items-center gap-1.5 pl-4 pr-2 py-2"
@@ -399,9 +403,31 @@ export function MoveBar({ selection }: { selection: Selection }) {
         <span className="text-brand font-mono">{count}</span> selected
       </span>
       <span className="w-px h-5 bg-line-strong mx-1" />
+      {children}
+      <Button kind="ghost" size="sm" onClick={selection.clear}>Cancel</Button>
+      <style>{`@keyframes rise { from { opacity: 0; transform: translate(-50%, 8px) } to { transform: translate(-50%, 0) } }`}</style>
+    </div>
+  )
+}
 
+/** Menu-trigger styled like the ActionBar's outline buttons. */
+export const actionTriggerCls =
+  'text-sm font-medium border border-input rounded-lg px-2.5 py-1 hover:bg-raised transition-colors outline-none'
+
+export function MoveBar({ selection }: { selection: Selection }) {
+  const { space } = useSpace()
+  const sprints = useSprints(space.id)
+  const users = useUsers()
+  const move = useMoveTasks()
+  const update = useUpdateTask()
+  const del = useDeleteTask()
+  const count = selection.selected.size
+  const ids = [...selection.selected]
+
+  return (
+    <ActionBar selection={selection}>
       <DropdownMenu>
-        <DropdownMenuTrigger className="text-sm font-medium border border-input rounded-lg px-2.5 py-1 hover:bg-raised transition-colors outline-none">
+        <DropdownMenuTrigger className={actionTriggerCls}>
           Move to…
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top">
@@ -433,7 +459,7 @@ export function MoveBar({ selection }: { selection: Selection }) {
       </DropdownMenu>
 
       <DropdownMenu>
-        <DropdownMenuTrigger className="text-sm font-medium border border-input rounded-lg px-2.5 py-1 hover:bg-raised transition-colors outline-none">
+        <DropdownMenuTrigger className={actionTriggerCls}>
           Assign to…
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top">
@@ -452,9 +478,18 @@ export function MoveBar({ selection }: { selection: Selection }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button kind="ghost" size="sm" onClick={selection.clear}>Cancel</Button>
-      <style>{`@keyframes rise { from { opacity: 0; transform: translate(-50%, 8px) } to { transform: translate(-50%, 0) } }`}</style>
-    </div>
+      <Button
+        kind="danger"
+        size="sm"
+        onClick={async () => {
+          if (!confirm(`Delete ${count} task${count === 1 ? '' : 's'}? This cannot be undone.`)) return
+          await Promise.all(ids.map((id) => del.mutateAsync(id)))
+          selection.clear()
+        }}
+      >
+        Delete
+      </Button>
+    </ActionBar>
   )
 }
 

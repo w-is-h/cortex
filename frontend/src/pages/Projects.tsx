@@ -7,9 +7,13 @@ import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../ap
 import type { Project } from '../api/types'
 import { FilterMenu, useListFilters, useVisibleProjects } from '../components/filters'
 import { useSpace } from '../components/Shell'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
-import { PersonMenu } from '../components/TaskBits'
+import { ActionBar, actionTriggerCls, PersonMenu, useSelection, type Selection } from '../components/TaskBits'
 import {
   Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, projectHue,
   RowAccent, rowCls, rowHoverCls, SegmentedToggle,
@@ -33,6 +37,7 @@ export function Projects() {
   )
   const [creating, setCreating] = useState(false)
   const [tagFilter, setTagFilter] = useState<string[]>([])
+  const selection = useSelection()
 
   const all = useVisibleProjects(projects.data ?? [])
   const vocab = useMemo(
@@ -80,18 +85,20 @@ export function Projects() {
 
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
-        ? <div><List projects={items} groupBy={group} onTagClick={toggleTag} /></div>
+        ? <div><List projects={items} groupBy={group} onTagClick={toggleTag} selection={selection} /></div>
         : <Timeline projects={items.filter((p) => p.due_date)} groupBy={group} />)}
 
+      <ProjectBar selection={selection} />
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />
     </div>
   )
 }
 
-function List({ projects, groupBy, onTagClick }: {
+function List({ projects, groupBy, onTagClick, selection }: {
   projects: Project[]
   groupBy: ProjGroup
   onTagClick: (t: string) => void
+  selection: Selection
 }) {
   const users = useUsers()
   const { list: statuses } = useStatusDefs('project')
@@ -123,16 +130,34 @@ function List({ projects, groupBy, onTagClick }: {
     update.mutate({ id: proj.id, status: to })
   }
 
-  const rowInner = (p: Project) => {
+  const selecting = selection.selected.size > 0
+  const rowInner = (p: Project, orderedIds: number[]) => {
     const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
     return (
       <Link
         to={`/projects/${p.id}`}
         draggable={false}
-        className={`${rowCls} ${rowHoverCls} gap-3 pl-4 pr-3 py-2`}
+        onClick={(e) => {
+          if (e.shiftKey) { e.preventDefault(); selection.selectRange(p.id, orderedIds) }
+          else if (e.metaKey || e.ctrlKey || selecting) { e.preventDefault(); selection.toggle(p.id) }
+        }}
+        className={`${rowCls} ${
+          selection.isSelected(p.id) ? 'bg-brand-soft/60' : rowHoverCls
+        } gap-3 pl-4 pr-3 py-2 select-none`}
       >
         <RowAccent color={`hsl(${projectHue(p.id)} 70% 60%)`} />
+        <span
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            if (e.shiftKey) selection.selectRange(p.id, orderedIds)
+            else selection.toggle(p.id)
+          }}
+          className="grid place-items-center"
+        >
+          <Checkbox checked={selection.isSelected(p.id)} />
+        </span>
         {/* inside a Link: cancel navigation in capture phase — the trigger's own
             handler stops propagation, so a bubble-phase preventDefault never runs */}
         <span onClickCapture={(e) => e.preventDefault()} className="shrink-0 grid place-items-center">
@@ -171,7 +196,7 @@ function List({ projects, groupBy, onTagClick }: {
   if (groupBy === 'none') {
     return (
       <div className="flex flex-col gap-0.5">
-        {projects.map((p) => <div key={p.id}>{rowInner(p)}</div>)}
+        {projects.map((p) => <div key={p.id}>{rowInner(p, projects.map((x) => x.id))}</div>)}
       </div>
     )
   }
@@ -205,7 +230,7 @@ function List({ projects, groupBy, onTagClick }: {
               <span className="font-mono text-xs text-ink-faint">{g.items.length}</span>
             </div>
             <div className="flex flex-col gap-0.5">
-              {g.items.map((p) => <div key={p.id}>{rowInner(p)}</div>)}
+              {g.items.map((p) => <div key={p.id}>{rowInner(p, groups.flatMap((x) => x.items.map((i) => i.id)))}</div>)}
             </div>
           </div>
         ))}
@@ -235,7 +260,7 @@ function List({ projects, groupBy, onTagClick }: {
                     <Draggable draggableId={String(p.id)} index={i} key={p.id}>
                       {(pr) => (
                         <div ref={pr.innerRef} {...pr.draggableProps} {...pr.dragHandleProps}>
-                          {rowInner(p)}
+                          {rowInner(p, sections.flatMap((x) => (cols[x.key] ?? []).map((i) => i.id)))}
                         </div>
                       )}
                     </Draggable>
@@ -251,6 +276,44 @@ function List({ projects, groupBy, onTagClick }: {
         ))}
       </div>
     </DragDropContext>
+  )
+}
+
+/** Bulk actions for selected projects: status, owner, archive. */
+function ProjectBar({ selection }: { selection: Selection }) {
+  const { list: statuses } = useStatusDefs('project')
+  const users = useUsers()
+  const update = useUpdateProject()
+  const ids = [...selection.selected]
+  const apply = async (patch: Partial<Project>) => {
+    await Promise.all(ids.map((id) => update.mutateAsync({ id, ...patch })))
+    selection.clear()
+  }
+  return (
+    <ActionBar selection={selection}>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Status…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {statuses.map((s) => (
+            <DropdownMenuItem key={s.key} onClick={() => apply({ status: s.key })}>
+              <StatusBadge def={s} />
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Owner…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {users.data?.filter((u) => u.is_active).map((u) => (
+            <DropdownMenuItem key={u.id} onClick={() => apply({ owner_id: u.id })}>
+              <Avatar name={u.username} size={16} />
+              {u.username}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button size="sm" onClick={() => apply({ archived: true })}>Archive</Button>
+    </ActionBar>
   )
 }
 
