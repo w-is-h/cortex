@@ -61,7 +61,7 @@ export function Projects() {
           </span>
         )}
         <div className="flex-1" />
-        <FilterMenu archived users />
+        <FilterMenu archived empty users />
         <SegmentedToggle
           value={group}
           onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}

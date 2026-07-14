@@ -17,6 +17,7 @@ import { Avatar } from './ui'
 const KEY = {
   done: 'cortex.filter.done', // + '.<scope>'
   archived: 'cortex.filter.archived',
+  empty: 'cortex.filter.empty',
   users: 'cortex.filter.users',
 }
 const read = (key: string, dflt: boolean) => {
@@ -36,6 +37,7 @@ const scopeOf = (pathname: string) => {
 let state = {
   done: {} as Record<string, boolean>, // per-tab, read lazily
   showArchived: read(KEY.archived, false),
+  showEmpty: read(KEY.empty, true),
   userIds: readIds(KEY.users),
 }
 const subs = new Set<() => void>()
@@ -46,9 +48,10 @@ function setDone(scope: string, v: boolean) {
   subs.forEach((fn) => fn())
 }
 
-function set(patch: Partial<Pick<typeof state, 'showArchived' | 'userIds'>>) {
+function set(patch: Partial<Pick<typeof state, 'showArchived' | 'showEmpty' | 'userIds'>>) {
   state = { ...state, ...patch }
   localStorage.setItem(KEY.archived, state.showArchived ? '1' : '0')
+  localStorage.setItem(KEY.empty, state.showEmpty ? '1' : '0')
   localStorage.setItem(KEY.users, state.userIds.join(','))
   subs.forEach((fn) => fn())
 }
@@ -69,6 +72,7 @@ export function useListFilters() {
   return {
     showDone: s.done[scopeOf(pathname)] ?? read(`${KEY.done}.${scopeOf(pathname)}`, true),
     showArchived: s.showArchived,
+    showEmpty: s.showEmpty,
     userIds: s.userIds,
   }
 }
@@ -105,17 +109,23 @@ export function useVisibleTasks<T extends { status: string; assignee_id: number 
   return useVisibleByPerson(useVisibleByStatus(items, 'task'), 'assignee_id')
 }
 
-/** Project lists: the status filter plus the people filter on the owner. */
-export function useVisibleProjects<T extends { status: string; owner_id: number | null }>(
-  items: T[],
-): T[] {
-  return useVisibleByPerson(useVisibleByStatus(items, 'project'), 'owner_id')
+/** Project lists: status + people (owner) filters, plus the empty-project toggle. */
+export function useVisibleProjects<T extends {
+  status: string; owner_id: number | null; total_tasks: number
+}>(items: T[]): T[] {
+  const { showEmpty } = useListFilters()
+  const visible = useVisibleByPerson(useVisibleByStatus(items, 'project'), 'owner_id')
+  return useMemo(
+    () => (showEmpty ? visible : visible.filter((p) => p.total_tasks > 0)),
+    [visible, showEmpty],
+  )
 }
 
 /** Funnel dropdown for the page header; pages opt into the toggles that apply. */
-export function FilterMenu({ done = true, archived = false, users = false }: {
+export function FilterMenu({ done = true, archived = false, empty = false, users = false }: {
   done?: boolean
   archived?: boolean
+  empty?: boolean
   users?: boolean
 }) {
   const filters = useListFilters()
@@ -125,6 +135,7 @@ export function FilterMenu({ done = true, archived = false, users = false }: {
   const filtering =
     (done && !filters.showDone) ||
     (archived && filters.showArchived) ||
+    (empty && !filters.showEmpty) ||
     (users && filters.userIds.length > 0)
   return (
     <DropdownMenu>
@@ -151,6 +162,14 @@ export function FilterMenu({ done = true, archived = false, users = false }: {
             onCheckedChange={(c) => set({ showArchived: c === true })}
           >
             Show archived
+          </DropdownMenuCheckboxItem>
+        )}
+        {empty && (
+          <DropdownMenuCheckboxItem
+            checked={filters.showEmpty}
+            onCheckedChange={(c) => set({ showEmpty: c === true })}
+          >
+            Show empty
           </DropdownMenuCheckboxItem>
         )}
         {users && active.length > 0 && (
