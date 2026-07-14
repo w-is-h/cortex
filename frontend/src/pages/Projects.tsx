@@ -589,8 +589,9 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                   top,
                   left,
                   width,
+                  // fade only the last week or so, whatever the bar's length
                   background: end == null
-                    ? `linear-gradient(to right, ${color} 55%, transparent)`
+                    ? `linear-gradient(to right, ${color} ${Math.max(width - 10 * pxPerDay, width * 0.4)}px, transparent)`
                     : color,
                 }}
                 title={`${p.title} · ${fmtDate(isoLocal(start))} → ${end == null ? 'ongoing' : fmtDate(isoLocal(end))}`}
