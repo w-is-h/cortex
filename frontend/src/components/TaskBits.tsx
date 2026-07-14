@@ -409,8 +409,11 @@ export function ActionBar({ selection, children }: {
   if (count === 0) return null
   return (
     <div
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-popover border border-line-strong rounded-xl shadow-xl shadow-black/40 flex items-center gap-1.5 pl-4 pr-2 py-2"
-      style={{ animation: 'rise 140ms ease-out' }}
+      className="fixed bottom-6 left-1/2 z-40 bg-popover border border-line-strong rounded-xl shadow-xl shadow-black/40 flex items-center gap-1.5 pl-4 pr-2 py-2"
+      // centering lives in `transform` (not the translate-x utility): Tailwind v4's
+      // -translate-x-1/2 sets the `translate` property, which composes with the
+      // keyframe transform — double shift while animating, then a snap to center
+      style={{ transform: 'translate(-50%, 0)', animation: 'rise 140ms ease-out' }}
     >
       <span className="text-sm font-medium whitespace-nowrap">
         <span className="text-brand font-mono">{count}</span> selected
