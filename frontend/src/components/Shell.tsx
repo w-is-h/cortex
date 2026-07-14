@@ -1,6 +1,6 @@
 import {
-  ChartNoAxesGantt, Check, ChevronsUpDown, Columns3, House, Inbox, LogOut, Moon,
-  PanelLeftClose, PanelLeftOpen, Plus, Repeat, Search, Sun, Users,
+  ChartNoAxesGantt, Check, ChevronsUpDown, Columns3, House, Inbox, KeyRound, LogOut,
+  Moon, PanelLeftClose, PanelLeftOpen, Plus, Repeat, Search, Sun, Users,
 } from 'lucide-react'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -315,6 +315,10 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/account')}>
+          <KeyRound />
+          API keys
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={async () => {
             await logout.mutateAsync()

@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import { Shell, SpaceRedirect } from './components/Shell'
 import { Admin } from './pages/Admin'
+import { Account } from './pages/Account'
 import { Backlog } from './pages/Backlog'
 import { Board } from './pages/Board'
 import { Home } from './pages/Home'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
       { path: 'projects/:id', element: <ProjectPage /> },
       { path: 'tasks/:id', element: <TaskPage /> },
       { path: 'admin', element: <Admin /> },
+      { path: 'account', element: <Account /> },
     ],
   },
 ])
