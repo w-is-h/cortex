@@ -1,34 +1,28 @@
 # cortex
 
-A fast, quiet sprint & task manager for small teams — and it's AI-first: agents
-plug in over a first-class REST API and MCP server and work the board like a
-teammate, while humans get a clean SPA.
+A sprint and task manager for small teams, built AI-first: agents connect over
+a REST API and an MCP server and work the board like a teammate; humans use a
+clean SPA.
 
-## Philosophy
+## Scope
 
-Cortex is deliberately small: one opinionated core, done well — not a feature
-checklist. The bet is that you have an AI agent (cortex ships an MCP server;
-that's the point), so a missing feature is a five-minute conversation with your
-agent, producing code custom-built for you — not a toggle buried in a settings
-maze built for everyone.
-
-**Want a feature? Don't open a PR — ask your agent**, and point it at
-[AGENTS.md](AGENTS.md): the maintainer's manual with the rules, invariants, and
-worked examples it needs to extend cortex safely. Your copy becomes yours; the
-core stays lean. Upstream takes bug fixes, performance, and schema/migration
-work — polish to the core, not new surface.
+The core is small and opinionated, and extending it is an agent's job. If you
+need a feature, ask your agent and point it at [AGENTS.md](AGENTS.md) — the
+maintainer's manual with the rules, invariants, and worked examples needed to
+extend cortex safely. Your copy diverges as you extend it; upstream takes bug
+fixes, performance, and schema/migration work.
 
 ## What you get
 
-- **Spaces** → sprints, backlog, projects, tasks — each space is its own world.
+- **Spaces** → sprints, backlog, projects, tasks — each space is fully separate.
 - **Board** with drag-and-drop kanban, a grouped list view, multi-select, and
   shift-click range select.
-- **One opinionated lifecycle**: todo / in progress / done — for tasks and projects
-  alike. Statuses live in code (`backend/cortex/statuses.py`) — if yours differ, edit
-  the list and the board, API validation and MCP docs all follow. Domain vocabulary
-  (phases, clients, "live") goes in project **tags** instead.
+- **One lifecycle**: todo / in progress / done — for tasks and projects alike.
+  Statuses live in code (`backend/cortex/statuses.py`) — if yours differ, edit
+  the list and the board, API validation and MCP docs all follow. Domain
+  vocabulary (phases, clients, "live") goes in project **tags**.
 - **Sprints** you can create, edit, and archive (auto-archives a week after it ends).
-- **Tasks**: markdown descriptions — rendered by default, click to edit, done
+- **Tasks**: markdown descriptions — rendered by default, click to edit
   (paste images, `@mentions`, clickable checkboxes) — priorities, assignees,
   blockers, comments with reactions, and a per-task activity trail. Each task
   gets a shareable id like `cx-123456789`.
@@ -69,7 +63,7 @@ claude mcp add --transport http cortex http://localhost:8000/mcp \
 ```
 
 A key acts as its owner, so give an agent its own user if you want its actions
-attributed to it. The MCP surface is deliberately small — 20 tools covering the verbs
-an agent actually performs: tasks (create/update/move/delete, blockers), sprints,
-projects, comments, full-text `search`, notifications, and one `get_workspace` call
-that returns who you are plus every id and status key the other tools expect.
+attributed to it. The MCP surface is 20 tools covering the verbs an agent
+performs: tasks (create/update/move/delete, blockers), sprints, projects,
+comments, full-text `search`, notifications, and one `get_workspace` call that
+returns who you are plus every id and status key the other tools expect.

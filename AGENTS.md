@@ -5,12 +5,13 @@ operate cortex — in this repo, you are the extension mechanism.
 
 ## The contract
 
-Cortex is one small core done extremely well, extended not by feature PRs but
-by each user's agent editing their own copy. Five rules keep that working:
+Cortex is one small core; features are added by each user's agent editing
+their own copy, and upstream takes bug fixes, performance, and
+schema/migration work. Five rules keep that working:
 
-1. **Minimal dependencies.** A dependency earns its place with accumulated
-   edge cases (an editor, a drag-and-drop engine), not typing time saved. If
-   you use one function from a library, write the function. Current counts:
+1. **Minimal dependencies.** A dependency earns its place by encapsulating
+   accumulated edge cases (an editor, a drag-and-drop engine). If you use one
+   function from a library, write the function. Current counts:
    backend 5, frontend 21 runtime (3 of those are self-hosted font asset
    packages) — justify any increase.
 2. **The schema is the contract.** Personal forks survive core updates iff the
@@ -34,10 +35,9 @@ by each user's agent editing their own copy. Five rules keep that working:
 Decide early which kind of fork you are; the contract weighs differently.
 
 1. **Branch out** (most forks — expect 80–90%): take the code and go. It's
-   your tool now — build what your team needs, your way; the rules above are
-   good taste to borrow, not law. These tools aren't meant to live a hundred
-   years: a fork serves a team for a year or two, and when the company
-   outgrows it you build the next thing, properly, for what you've become.
+   your tool now — build what your team needs, your way, and borrow whichever
+   of the rules above are useful. A fork typically serves a team for a year
+   or two; when the team outgrows it, build the next thing.
 2. **Track upstream**: you want to keep receiving core updates from this
    repo. Then the contract binds — rule 2 above all: keep the schema stable
    and your changes in the extension points (`statuses.py`, tags,
@@ -50,7 +50,7 @@ Decide early which kind of fork you are; the contract weighs differently.
       main.py         app factory: routers + MCP mount + SPA static serving
       db.py           connect() / transaction() / get_db() / migrate()
       migrations.py   ordered SQL scripts, PRAGMA user_version
-      statuses.py     status vocabularies — code, not DB (see below)
+      statuses.py     status vocabularies, defined in code (see below)
       models.py       pydantic request/response schemas (edge validation)
       auth.py         sessions + ck_* API keys (user_from_api_key, shared with MCP)
       errors.py       CortexError → HTTP status mapping
