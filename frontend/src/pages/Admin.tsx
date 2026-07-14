@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   useDeleteSpace, useUpdateSpace, useUserAdmin, useUsers,
@@ -23,6 +23,13 @@ function SpaceSettings() {
   const { space, spaces, setSpaceId } = useSpace()
   const update = useUpdateSpace()
   const del = useDeleteSpace()
+  const [name, setName] = useState(space.name)
+  useEffect(() => setName(space.name), [space.id, space.name])
+  const saveName = () => {
+    const v = name.trim()
+    if (v && v !== space.name) update.mutate({ id: space.id, name: v })
+    else setName(space.name)
+  }
   const onDelete = async () => {
     if (!confirm(`Delete space "${space.name}" and everything in it — tasks, projects, sprints, comments? This cannot be undone.`)) return
     await del.mutateAsync(space.id)
@@ -33,6 +40,20 @@ function SpaceSettings() {
     <section>
       <h1 className="text-base font-semibold mb-3">Space — {space.name}</h1>
       <div className="border border-line rounded-lg bg-panel divide-y divide-line">
+        <div className="flex items-center gap-3 px-3 py-2.5">
+          <span className="text-sm font-medium">Name</span>
+          <span className="flex-1" />
+          <input
+            className={`${inputCls} w-48`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') { setName(space.name); e.currentTarget.blur() }
+            }}
+          />
+        </div>
         <div className="flex items-center gap-3 px-3 py-2.5">
           <span className="text-sm font-medium">Default sprint length</span>
           <span className="flex-1" />
