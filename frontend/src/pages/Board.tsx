@@ -2,15 +2,14 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-p
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useCreateSprint, useSprints, useTasks, useUpdateTask } from '../api/hooks'
 import type { Sprint, StatusDef, Task } from '../api/types'
 import { FilterMenu, useListFilters, useVisibleTasks } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { useStatusDefs } from '../components/statuses'
 import {
-  AssigneeMenu, BlockedTag, MoveBar, NewTaskModal, ProjectChip, TaskTable, useSelection,
-  type Selection,
+  AssigneeMenu, BlockedTag, MoveBar, NewTaskModal, ProjectChip, SelectBox, TaskTable,
+  useSelection, type Selection,
 } from '../components/TaskBits'
 import {
   Button, Empty, Field, fmtDate, inputCls, Modal, Pick, PRIO_COLOR, SegmentedToggle,
@@ -290,14 +289,14 @@ function Card({ task, selection, dragging, orderedIds, done }: {
       style={{ borderLeftWidth: 3, borderLeftColor: PRIO_COLOR[task.priority] }}
       title={selecting ? 'Click to toggle selection' : '⌘-click to select'}
     >
-      <span
-        onClick={(e) => e.stopPropagation()}
+      <SelectBox
+        id={task.id}
+        selection={selection}
+        orderedIds={orderedIds}
         className={`absolute top-2.5 right-2.5 transition-opacity ${
           selected || selecting ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
-      >
-        <Checkbox checked={selected} onCheckedChange={() => selection.toggle(task.id)} />
-      </span>
+      />
 
       {task.blocked && <div className="mb-1.5"><BlockedTag /></div>}
 

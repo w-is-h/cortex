@@ -7,13 +7,12 @@ import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../ap
 import type { Project } from '../api/types'
 import { FilterMenu, useListFilters, useVisibleProjects } from '../components/filters'
 import { useSpace } from '../components/Shell'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
-import { ActionBar, actionTriggerCls, PersonMenu, useSelection, type Selection } from '../components/TaskBits'
+import { ActionBar, actionTriggerCls, PersonMenu, SelectBox, useSelection, type Selection } from '../components/TaskBits'
 import {
   Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, projectHue,
   RowAccent, rowCls, rowHoverCls, SegmentedToggle,
@@ -147,17 +146,7 @@ function List({ projects, groupBy, onTagClick, selection }: {
         } gap-3 pl-4 pr-3 py-2 select-none`}
       >
         <RowAccent color={`hsl(${projectHue(p.id)} 70% 60%)`} />
-        <span
-          onClick={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            if (e.shiftKey) selection.selectRange(p.id, orderedIds)
-            else selection.toggle(p.id)
-          }}
-          className="grid place-items-center"
-        >
-          <Checkbox checked={selection.isSelected(p.id)} />
-        </span>
+        <SelectBox id={p.id} selection={selection} orderedIds={orderedIds} />
         {/* inside a Link: cancel navigation in capture phase — the trigger's own
             handler stops propagation, so a bubble-phase preventDefault never runs */}
         <span onClickCapture={(e) => e.preventDefault()} className="shrink-0 grid place-items-center">

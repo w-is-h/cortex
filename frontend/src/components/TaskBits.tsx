@@ -65,6 +65,31 @@ export function useSelection() {
 
 export type Selection = ReturnType<typeof useSelection>
 
+/** Bulk-select checkbox: plain click toggles, shift-click extends from the anchor.
+ *  base-ui replays each click through its hidden input — the INPUT guard keeps
+ *  one gesture from toggling twice (which reads as a dead click). */
+export function SelectBox({ id, selection, orderedIds, className = 'grid place-items-center' }: {
+  id: number
+  selection: Selection
+  orderedIds: number[]
+  className?: string
+}) {
+  return (
+    <span
+      onClick={(e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        if ((e.target as HTMLElement).tagName === 'INPUT') return
+        if (e.shiftKey) selection.selectRange(id, orderedIds)
+        else selection.toggle(id)
+      }}
+      className={className}
+    >
+      <Checkbox checked={selection.isSelected(id)} />
+    </span>
+  )
+}
+
 // ---- small pieces
 
 export function BlockedTag() {
@@ -204,19 +229,7 @@ export function TaskRow({ task, selection, orderedIds, showProject = false, spri
       } gap-3 pl-4 pr-3 py-2 cursor-pointer select-none`}
     >
       <RowAccent color={PRIO_COLOR[task.priority]} />
-      {selection && (
-        <span
-          onClick={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            if (e.shiftKey) selection.selectRange(task.id, orderedIds)
-            else selection.toggle(task.id)
-          }}
-          className="grid place-items-center"
-        >
-          <Checkbox checked={selection.isSelected(task.id)} />
-        </span>
-      )}
+      {selection && <SelectBox id={task.id} selection={selection} orderedIds={orderedIds} />}
       <PrioDot priority={task.priority} />
       <span className={`flex-1 text-[1.02rem] font-medium truncate ${doneKeys.has(task.status) ? 'text-ink-faint' : ''}`}>
         {task.title}
