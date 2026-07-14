@@ -13,7 +13,7 @@ import type { Priority, Task } from '../api/types'
 import { bucketBy } from '@/lib/utils'
 import { useVisibleTasks } from './filters'
 import { useSpace } from './Shell'
-import { useStatusDefs } from './statuses'
+import { StatusBadge, useStatusDefs } from './statuses'
 import { chipStyle, TagChip } from './tags'
 import {
   Avatar, Button, Field, inputCls, Modal, Pick, PRIO_COLOR, PRIORITIES, PrioDot,
@@ -158,6 +158,33 @@ export function PersonMenu({ currentId, onPick, size = 22, clearLabel = 'Unassig
             <Avatar name={u.username} size={16} />
             <span className="truncate">{u.username}</span>
             {u.id === currentId && <Check className="ml-auto size-3.5 text-brand" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** Clickable priority dot → dropdown to change it. */
+export function PrioMenu({ current, onPick }: {
+  current: Priority
+  onPick: (p: Priority) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        onClick={(e) => e.stopPropagation()}
+        className="grid place-items-center size-5 rounded-full outline-none hover:bg-accent shrink-0"
+        title={`${current} priority — click to change`}
+      >
+        <PrioDot priority={current} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="w-36">
+        {PRIORITIES.map((p) => (
+          <DropdownMenuItem key={p} onClick={() => onPick(p)}>
+            <PrioDot priority={p} />
+            {p}
+            {p === current && <Check className="ml-auto size-3.5 text-brand" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -437,15 +464,50 @@ export function MoveBar({ selection }: { selection: Selection }) {
   const move = useMoveTasks()
   const update = useUpdateTask()
   const del = useDeleteTask()
+  const { list: statuses } = useStatusDefs('task')
   const count = selection.selected.size
   const ids = [...selection.selected]
+  const apply = async (patch: Partial<Task>) => {
+    await Promise.all(ids.map((id) => update.mutateAsync({ id, ...patch })))
+    selection.clear()
+  }
 
   return (
     <ActionBar selection={selection}>
       <DropdownMenu>
-        <DropdownMenuTrigger className={actionTriggerCls}>
-          Move to…
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger className={actionTriggerCls}>Status…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {statuses.map((s) => (
+            <DropdownMenuItem key={s.key} onClick={() => apply({ status: s.key })}>
+              <StatusBadge def={s} />
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Priority…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {PRIORITIES.map((p) => (
+            <DropdownMenuItem key={p} onClick={() => apply({ priority: p })}>
+              <PrioDot priority={p} />
+              {p}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Assignee…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {users.data?.filter((u) => u.is_active).map((u) => (
+            <DropdownMenuItem key={u.id} onClick={() => apply({ assignee_id: u.id })}>
+              <Avatar name={u.username} size={16} />
+              {u.username}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Move to…</DropdownMenuTrigger>
         <DropdownMenuContent side="top">
           <DropdownMenuItem
             onClick={async () => {
@@ -473,27 +535,6 @@ export function MoveBar({ selection }: { selection: Selection }) {
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger className={actionTriggerCls}>
-          Assign to…
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top">
-          {users.data?.filter((u) => u.is_active).map((u) => (
-            <DropdownMenuItem
-              key={u.id}
-              onClick={async () => {
-                await Promise.all(ids.map((id) => update.mutateAsync({ id, assignee_id: u.id })))
-                selection.clear()
-              }}
-            >
-              <Avatar name={u.username} size={16} />
-              {u.username}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
       <Button
         kind="danger"
         size="sm"

@@ -91,6 +91,11 @@ export interface TaskDetail extends Task {
   blocking: Task[]
 }
 
+export interface Milestone {
+  title: string
+  date: string
+}
+
 export interface Project {
   id: number
   space_id: number
@@ -100,7 +105,9 @@ export interface Project {
   start_date: string | null
   owner_id: number | null
   status: string
+  priority: Priority
   tags: string[]
+  milestones: Milestone[]
   archived: boolean
   created_at: string
   open_tasks: number

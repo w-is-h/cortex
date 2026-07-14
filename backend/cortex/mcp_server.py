@@ -15,7 +15,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from . import db
 from .auth import User, user_from_api_key
-from .models import Priority
+from .models import Milestone, Priority
 from .services import (comments, notifications, projects,
                        search as search_service, spaces, sprints, tasks, users)
 from .statuses import PROJECT_STATUSES, TASK_STATUSES, ProjectStatus, Status
@@ -232,15 +232,20 @@ def get_project(project_id: int) -> dict:
 def create_project(space_id: int, title: str, description: str = "",
                    due_date: str | None = None, start_date: str | None = None,
                    owner_id: int | None = None, status: ProjectStatus = "todo",
-                   tags: list[str] | None = None) -> dict:
+                   priority: Priority = "medium",
+                   tags: list[str] | None = None,
+                   milestones: list[Milestone] | None = None) -> dict:
     """Create a project. Deliverables get a due_date (YYYY-MM-DD, shows on the
     timeline); ongoing/stream projects omit it. tags are freeform lowercase labels
-    (e.g. ['live', 'client-acme']) — see get_workspace for the vocabulary in use."""
+    (e.g. ['live', 'client-acme']) — see get_workspace for the vocabulary in use.
+    milestones are {title, date YYYY-MM-DD} pairs shown on the timeline."""
     with db.transaction() as conn:
         return projects.create(conn, current_user(), {
             "space_id": space_id, "title": title, "description": description,
             "due_date": due_date, "start_date": start_date,
-            "owner_id": owner_id, "status": status, "tags": tags or []})
+            "owner_id": owner_id, "status": status, "priority": priority,
+            "tags": tags or [],
+            "milestones": [m.model_dump() for m in milestones or []]})
 
 
 ClearableProjectField = Literal["owner_id", "start_date", "due_date", "description"]
@@ -249,15 +254,22 @@ ClearableProjectField = Literal["owner_id", "start_date", "due_date", "descripti
 def update_project(project_id: int, title: str | None = None, description: str | None = None,
                    due_date: str | None = None, start_date: str | None = None,
                    owner_id: int | None = None, status: ProjectStatus | None = None,
-                   tags: list[str] | None = None, archived: bool | None = None,
+                   priority: Priority | None = None,
+                   tags: list[str] | None = None,
+                   milestones: list[Milestone] | None = None,
+                   archived: bool | None = None,
                    clear: list[ClearableProjectField] | None = None) -> dict:
-    """Update a project; only the fields you pass change. tags replaces the whole
-    tag set (pass [] to remove all). To empty another field, name it in `clear` —
+    """Update a project; only the fields you pass change. tags and milestones
+    replace their whole set (pass [] to remove all); milestones are {title,
+    date YYYY-MM-DD} pairs. To empty another field, name it in `clear` —
     e.g. clear=["owner_id"]."""
     fields = {k: v for k, v in {"title": title, "description": description,
                                 "due_date": due_date, "start_date": start_date,
-                                "owner_id": owner_id, "status": status, "tags": tags,
+                                "owner_id": owner_id, "status": status,
+                                "priority": priority, "tags": tags,
                                 "archived": archived}.items() if v is not None}
+    if milestones is not None:
+        fields["milestones"] = [m.model_dump() for m in milestones]
     for key in clear or []:
         fields[key] = "" if key == "description" else None
     with db.transaction() as conn:

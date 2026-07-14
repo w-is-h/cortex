@@ -12,9 +12,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
-import { ActionBar, actionTriggerCls, PersonMenu, SelectBox, useSelection, type Selection } from '../components/TaskBits'
+import { ActionBar, actionTriggerCls, PersonMenu, PrioMenu, SelectBox, useSelection, type Selection } from '../components/TaskBits'
 import {
-  Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, projectHue,
+  Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, PRIORITIES, PrioDot, projectHue,
   RowAccent, rowCls, rowHoverCls, SegmentedToggle,
 } from '../components/ui'
 
@@ -85,7 +85,7 @@ export function Projects() {
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
         ? <div><List projects={items} groupBy={group} onTagClick={toggleTag} selection={selection} /></div>
-        : <Timeline projects={items.filter((p) => p.due_date)} groupBy={group} />)}
+        : <Timeline projects={items.filter((p) => p.due_date || p.start_date)} groupBy={group} />)}
 
       <ProjectBar selection={selection} />
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />
@@ -133,6 +133,7 @@ function List({ projects, groupBy, onTagClick, selection }: {
   const rowInner = (p: Project, orderedIds: number[]) => {
     const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
+    const nextMs = p.milestones.find((m) => ts(m.date) >= today()) // server keeps them date-sorted
     return (
       <Link
         to={`/projects/${p.id}`}
@@ -158,12 +159,26 @@ function List({ projects, groupBy, onTagClick, selection }: {
             onPick={(owner_id) => update.mutate({ id: p.id, owner_id })}
           />
         </span>
+        <span onClickCapture={(e) => e.preventDefault()} className="shrink-0 grid place-items-center">
+          <PrioMenu
+            current={p.priority}
+            onPick={(priority) => update.mutate({ id: p.id, priority })}
+          />
+        </span>
         <span className={`text-[1.02rem] font-medium truncate ${p.archived ? 'text-ink-faint' : ''}`}>
           {p.title}
         </span>
         <span className="flex-1 flex items-center gap-1 min-w-0">
           {p.tags.map((t) => <TagChip key={t} tag={t} onClick={() => onTagClick(t)} />)}
         </span>
+        {nextMs && (
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium rounded-md px-1.5 py-px bg-brand-soft text-brand whitespace-nowrap"
+                title="next milestone">
+            <span className="size-1.5 rotate-45 bg-brand shrink-0" />
+            <span className="font-mono">{fmtDate(nextMs.date)}</span>
+            <span className="truncate max-w-40">{nextMs.title}</span>
+          </span>
+        )}
         {p.total_tasks > 0 && (
           <span className="flex items-center gap-2 text-xs text-ink-dim font-mono">
             {done}/{p.total_tasks}
@@ -291,6 +306,17 @@ function ProjectBar({ selection }: { selection: Selection }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
+        <DropdownMenuTrigger className={actionTriggerCls}>Priority…</DropdownMenuTrigger>
+        <DropdownMenuContent side="top">
+          {PRIORITIES.map((p) => (
+            <DropdownMenuItem key={p} onClick={() => apply({ priority: p })}>
+              <PrioDot priority={p} />
+              {p}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
         <DropdownMenuTrigger className={actionTriggerCls}>Owner…</DropdownMenuTrigger>
         <DropdownMenuContent side="top">
           {users.data?.filter((u) => u.is_active).map((u) => (
@@ -315,7 +341,8 @@ const isoLocal = (t: number) => {
 }
 
 type Scale = 'weeks' | 'months'
-type Drag = { id: number; edge: 'start' | 'end'; x: number; s: number; e: number }
+// e is null for open-ended projects (no due date): only the start edge drags
+type Drag = { id: number; edge: 'start' | 'end'; x: number; s: number; e: number | null }
 
 const TL_HEADER_H = 24
 const TL_ROW_H = 34
@@ -332,14 +359,17 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
   const pxPerDay = scale === 'weeks' ? 20 : 6
 
   // live overrides while dragging a bar edge; committed to the server on release
-  const [override, setOverride] = useState<Record<number, { start: number; end: number }>>({})
+  const [override, setOverride] = useState<Record<number, { start: number; end: number | null }>>({})
   const overrideRef = useRef(override)
   overrideRef.current = override
   const drag = useRef<Drag | null>(null)
 
-  // callers pass only dated projects (due_date filtered upstream)
+  // callers pass only projects with a due or start date; end is null when open-ended
   const dates = (p: Project) =>
-    override[p.id] ?? { start: ts(p.start_date ?? p.created_at.slice(0, 10)), end: ts(p.due_date!) }
+    override[p.id] ?? {
+      start: ts(p.start_date ?? p.created_at.slice(0, 10)),
+      end: p.due_date ? ts(p.due_date) : null,
+    }
 
   const byStart = (a: Project, b: Project) =>
     ts(a.start_date ?? a.created_at.slice(0, 10)) - ts(b.start_date ?? b.created_at.slice(0, 10)) || a.id - b.id
@@ -404,8 +434,12 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
 
   const { min, baseMax } = useMemo(() => {
     const starts = projects.map((p) => ts(p.start_date ?? p.created_at.slice(0, 10)))
-    const ends = projects.map((p) => ts(p.due_date!))
-    return { min: Math.min(...starts, today()) - 7 * DAY, baseMax: Math.max(...ends, today()) + 14 * DAY }
+    const ends = projects.filter((p) => p.due_date).map((p) => ts(p.due_date!))
+    const ms = projects.flatMap((p) => p.milestones.map((m) => ts(m.date)))
+    return {
+      min: Math.min(...starts, today()) - 7 * DAY,
+      baseMax: Math.max(...ends, ...ms, today()) + 14 * DAY,
+    }
   }, [projects])
 
   const neededDays = hostW > 0 ? Math.ceil((hostW - 32) / pxPerDay) : 0
@@ -440,8 +474,8 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
       const d = drag.current
       if (!d) return
       const delta = Math.round((e.clientX - d.x) / pxPerDay) * DAY
-      const start = d.edge === 'start' ? Math.min(d.s + delta, d.e) : d.s
-      const end = d.edge === 'end' ? Math.max(d.e + delta, d.s) : d.e
+      const start = d.edge === 'start' ? (d.e == null ? d.s + delta : Math.min(d.s + delta, d.e)) : d.s
+      const end = d.edge === 'end' && d.e != null ? Math.max(d.e + delta, d.s) : d.e
       setOverride((o) => ({ ...o, [d.id]: { start, end } }))
     }
     const up = () => {
@@ -449,7 +483,10 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
       if (!d) return
       drag.current = null
       const cur = overrideRef.current[d.id]
-      if (cur) update.mutate({ id: d.id, start_date: isoLocal(cur.start), due_date: isoLocal(cur.end) })
+      if (cur) update.mutate({
+        id: d.id, start_date: isoLocal(cur.start),
+        ...(cur.end != null && { due_date: isoLocal(cur.end) }),
+      })
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
@@ -507,9 +544,15 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
           {/* bars */}
           {rows.map(({ p, top }) => {
             const { start, end } = dates(p)
-            const overdue = end < today() && p.open_tasks > 0
+            const overdue = end != null && end < today() && p.open_tasks > 0
             const left = x(start)
-            const width = Math.max((end - start) / DAY, 0.5) * pxPerDay + pxPerDay
+            // open-ended bars fade out instead of ending; run to today + 2 weeks,
+            // or past the last milestone if one is further out
+            const lastMs = Math.max(0, ...p.milestones.map((m) => ts(m.date)))
+            const drawEnd = end ?? Math.max(today(), start, lastMs) + 14 * DAY
+            const width = Math.max((drawEnd - start) / DAY, 0.5) * pxPerDay + pxPerDay
+            const color = overdue ? 'var(--color-prio-urgent)'
+              : p.archived ? 'var(--color-ink-faint)' : 'var(--color-brand)'
             return (
               <Link
                 key={p.id}
@@ -521,9 +564,11 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                   top,
                   left,
                   width,
-                  background: overdue ? 'var(--color-prio-urgent)' : p.archived ? 'var(--color-ink-faint)' : 'var(--color-brand)',
+                  background: end == null
+                    ? `linear-gradient(to right, ${color} 55%, transparent)`
+                    : color,
                 }}
-                title={`${p.title} · ${fmtDate(isoLocal(start))} → ${fmtDate(isoLocal(end))}`}
+                title={`${p.title} · ${fmtDate(isoLocal(start))} → ${end == null ? 'ongoing' : fmtDate(isoLocal(end))}`}
               >
                 <span
                   onMouseDown={(e) => startDrag(e, p, 'start')}
@@ -532,15 +577,28 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                   title="Drag to change start"
                 />
                 <span className="truncate pointer-events-none">{p.title}</span>
-                <span
-                  onMouseDown={(e) => startDrag(e, p, 'end')}
-                  onClick={(e) => e.preventDefault()}
-                  className="absolute right-0 inset-y-0 w-2 cursor-ew-resize rounded-r-md opacity-0 group-hover:opacity-100 bg-black/20"
-                  title="Drag to change due date"
-                />
+                {end != null && (
+                  <span
+                    onMouseDown={(e) => startDrag(e, p, 'end')}
+                    onClick={(e) => e.preventDefault()}
+                    className="absolute right-0 inset-y-0 w-2 cursor-ew-resize rounded-r-md opacity-0 group-hover:opacity-100 bg-black/20"
+                    title="Drag to change due date"
+                  />
+                )}
               </Link>
             )
           })}
+          {/* milestone diamonds, over the bars */}
+          {rows.flatMap(({ p, top }) =>
+            p.milestones.map((m) => (
+              <span
+                key={`${p.id}-${m.date}-${m.title}`}
+                className="absolute z-10 size-2.5 rotate-45 rounded-[2px] bg-panel border-2 border-brand"
+                style={{ top: top + 7, left: x(ts(m.date)) - 5 }}
+                title={`${m.title} · ${fmtDate(m.date)}`}
+              />
+            )),
+          )}
         </div>
         </div>
       </div>
@@ -558,6 +616,7 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
   const [start, setStart] = useState('')
   const [owner, setOwner] = useState('')
   const [status, setStatus] = useState('')
+  const [priority, setPriority] = useState('medium')
 
   return (
     <Modal open={open} onClose={onClose} title="New project">
@@ -572,8 +631,9 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
             start_date: start || undefined,
             owner_id: owner ? Number(owner) : null,
             status: status || undefined,
+            priority,
           })
-          setTitle(''); setDue(''); setStart(''); setOwner(''); setStatus('')
+          setTitle(''); setDue(''); setStart(''); setOwner(''); setStatus(''); setPriority('medium')
           onClose()
         }}
         className="space-y-3"
@@ -588,13 +648,23 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
             <input type="date" className={inputCls} value={due} onChange={(e) => setDue(e.target.value)} />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Field label="Status">
             <Pick
               value={status || null}
               placeholder={projStatuses[0]?.label ?? '—'}
               onChange={setStatus}
               options={projStatuses.map((s) => ({ value: s.key, label: s.label }))}
+            />
+          </Field>
+          <Field label="Priority">
+            <Pick
+              value={priority}
+              onChange={setPriority}
+              options={PRIORITIES.map((p) => ({
+                value: p,
+                label: <span className="flex items-center gap-1.5"><PrioDot priority={p} /> {p}</span>,
+              }))}
             />
           </Field>
           <Field label="Owner (optional)">

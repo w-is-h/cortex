@@ -1,3 +1,4 @@
+import json
 import re
 import sqlite3
 from datetime import date
@@ -17,7 +18,13 @@ def _row(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["archived"] = bool(d["archived"])
     d["tags"] = d["tags"].split()
+    d["milestones"] = json.loads(d["milestones"])
     return d
+
+
+def _dump_milestones(milestones: list[dict]) -> str:
+    out = [{"title": m["title"], "date": _iso(m["date"])} for m in milestones]
+    return json.dumps(sorted(out, key=lambda m: m["date"]))
 
 
 def norm_tags(tags: list[str]) -> list[str]:
@@ -59,11 +66,13 @@ def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
     spaces.get(db, data["space_id"])
     cur = db.execute(
         """INSERT INTO projects (space_id, title, description, due_date, start_date,
-               owner_id, status, tags, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               owner_id, status, priority, tags, milestones, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (data["space_id"], data["title"], data.get("description", ""),
          _iso(data.get("due_date")), _iso(data.get("start_date")), data.get("owner_id"),
-         data["status"], " ".join(norm_tags(data.get("tags") or [])), now()),
+         data["status"], data.get("priority", "medium"),
+         " ".join(norm_tags(data.get("tags") or [])),
+         _dump_milestones(data.get("milestones") or []), now()),
     )
     return get(db, cur.lastrowid)
 
@@ -76,7 +85,17 @@ def detail(db: sqlite3.Connection, project: dict) -> dict:
 
 
 UPDATABLE = {"title", "description", "due_date", "start_date", "owner_id",
-             "status", "tags", "archived"}
+             "status", "priority", "tags", "milestones", "archived"}
+
+
+def _to_sql(key: str, v):
+    if key == "tags":
+        return " ".join(norm_tags(v))
+    if key == "milestones":
+        return _dump_milestones(v)
+    if isinstance(v, bool):
+        return int(v)
+    return _iso(v) if isinstance(v, date) else v
 
 
 def update(db: sqlite3.Connection, actor: User, project_id: int, fields: dict) -> dict:
@@ -84,10 +103,7 @@ def update(db: sqlite3.Connection, actor: User, project_id: int, fields: dict) -
     fields = {k: v for k, v in fields.items() if k in UPDATABLE}
     if not fields:
         return get(db, project_id)
-    values = [" ".join(norm_tags(v)) if isinstance(v, list)
-              else int(v) if isinstance(v, bool)
-              else _iso(v) if isinstance(v, date) else v
-              for v in fields.values()]
+    values = [_to_sql(k, v) for k, v in fields.items()]
     sets = ", ".join(f"{k} = ?" for k in fields)
     db.execute(f"UPDATE projects SET {sets} WHERE id = ?", (*values, project_id))
     return get(db, project_id)

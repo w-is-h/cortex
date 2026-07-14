@@ -57,7 +57,7 @@ Decide early which kind of fork you are; the contract weighs differently.
       services/       all domain logic
       routers/        thin REST shims over services
       mcp_server.py   23 MCP tools over the same services (/mcp, Bearer ck_*)
-    backend/tests/    35 tests; conftest boots the real app on a tmp SQLite
+    backend/tests/    36 tests; conftest boots the real app on a tmp SQLite
     frontend/src/     Vite + React SPA (react-query, hello-pangea/dnd, tailwind)
 
 ## Domain invariants (enforced in services/, covered by tests)
@@ -67,7 +67,9 @@ Decide early which kind of fork you are; the contract weighs differently.
   the `Status` / `ProjectStatus` Literals at both REST and MCP edges.
 - **Projects**: `tags` are the customization axis — freeform, normalized
   (`norm_tags`: lowercase, no `#`, hyphens), no registry. `due_date` is
-  nullable: deliverables have one, ongoing/stream projects don't. Done or
+  nullable: deliverables have one, ongoing/stream projects don't. `priority`
+  shares the task vocabulary. `milestones` is a JSON list of `{title, date}`
+  kept date-sorted; updates replace the whole set, like tags. Done or
   archived projects reject new/moved-in tasks (409).
 - **Sprints**: `is_current` and `archived` are derived (end + 7 days), with
   `archived_override` winning; archived sprints reject moves in.
@@ -91,7 +93,7 @@ Decide early which kind of fork you are; the contract weighs differently.
 
 ## Verify
 
-- `uv run pytest` — 35 tests, ~1 second. This is the gate.
+- `uv run pytest` — 36 tests, ~1 second. This is the gate.
 - Live: `./start.sh`, then `scripts/smoke.sh` and `uv run scripts/mcp_check.py`.
   Both write to the live DB — clean up what they create.
 - Frontend: `cd frontend && npm run build` must be clean.

@@ -1,8 +1,8 @@
-import { Archive, ChevronRight, Plus } from 'lucide-react'
+import { Archive, ChevronRight, History, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
-import type { ProjectDetail } from '../api/types'
+import type { Milestone, Priority, ProjectDetail } from '../api/types'
 import { Feed } from '../components/Feed'
 import { FilterMenu } from '../components/filters'
 import { DescriptionEditor } from '../components/MarkdownEditor'
@@ -10,7 +10,7 @@ import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagsEditor } from '../components/tags'
 import { NewTaskModal, TaskTable, MoveBar, useSelection } from '../components/TaskBits'
-import { Avatar, Button, Field, inputCls, Pick } from '../components/ui'
+import { Avatar, Button, Field, fmtDate, inputCls, Pick, PRIORITIES, PrioDot } from '../components/ui'
 
 export function ProjectPage() {
   const { id } = useParams()
@@ -101,6 +101,16 @@ function ProjectView({ project }: { project: ProjectDetail }) {
               options={projStatuses.map((s) => ({ value: s.key, label: s.label }))}
             />
           </Field>
+          <Field label="Priority">
+            <Pick
+              value={project.priority}
+              onChange={(v) => update.mutate({ id: project.id, priority: v as Priority })}
+              options={PRIORITIES.map((p) => ({
+                value: p,
+                label: <span className="flex items-center gap-1.5"><PrioDot priority={p} /> {p}</span>,
+              }))}
+            />
+          </Field>
           <Field label="Owner">
             <Pick
               value={project.owner_id != null ? String(project.owner_id) : 'none'}
@@ -126,6 +136,10 @@ function ProjectView({ project }: { project: ProjectDetail }) {
             <TagsEditor tags={project.tags} vocab={vocab}
                         onChange={(tags) => update.mutate({ id: project.id, tags })} />
           </Field>
+        </div>
+        <div className="mt-3">
+          <MilestonesEditor milestones={project.milestones}
+                            onChange={(milestones) => update.mutate({ id: project.id, milestones })} />
         </div>
 
         {/* tasks */}
@@ -163,6 +177,64 @@ function ProjectView({ project }: { project: ProjectDetail }) {
 
       <MoveBar selection={selection} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} projectId={project.id} />
+    </div>
+  )
+}
+
+/** Milestones: a date-sorted list of {title, date}; every change replaces the
+ *  set. Past milestones are hidden by default behind the history toggle. */
+function MilestonesEditor({ milestones, onChange }: {
+  milestones: Milestone[]
+  onChange: (ms: Milestone[]) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [date, setDate] = useState('')
+  const [showPast, setShowPast] = useState(false)
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const past = milestones.filter((m) => m.date < todayIso)
+  const visible = showPast ? milestones : milestones.filter((m) => m.date >= todayIso)
+  const add = () => {
+    if (!title.trim() || !date) return
+    onChange([...milestones, { title: title.trim(), date }])
+    setTitle(''); setDate('')
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="text-xs font-medium text-ink-dim">Milestones</span>
+        {past.length > 0 && (
+          <button
+            onClick={() => setShowPast((v) => !v)}
+            className={`transition-colors ${showPast ? 'text-brand' : 'text-ink-faint hover:text-ink'}`}
+            title={showPast ? 'Hide past milestones' : `Show ${past.length} past milestone${past.length === 1 ? '' : 's'}`}
+          >
+            <History className="size-3.5" />
+          </button>
+        )}
+      </div>
+      {visible.map((m) => (
+        <div key={`${m.date}-${m.title}`} className="group flex items-center gap-2.5 text-sm py-0.5">
+          <span className={`size-2 rotate-45 rounded-[1px] shrink-0 ml-0.5 ${m.date < todayIso ? 'bg-ink-faint' : 'bg-brand'}`} />
+          <span className="font-mono text-xs text-ink-dim whitespace-nowrap">{fmtDate(m.date)}</span>
+          <span className={`truncate ${m.date < todayIso ? 'text-ink-faint' : ''}`}>{m.title}</span>
+          <button
+            onClick={() => onChange(milestones.filter((x) => x !== m))}
+            className="opacity-0 group-hover:opacity-100 text-ink-faint hover:text-prio-urgent transition-opacity"
+            title="Remove milestone"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 pt-0.5 max-w-md">
+        <input type="date" className={`${inputCls} w-36`} value={date}
+               onChange={(e) => setDate(e.target.value)}
+               onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+        <input className={inputCls} placeholder="Add milestone — title, then ↵"
+               value={title}
+               onChange={(e) => setTitle(e.target.value)}
+               onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+      </div>
     </div>
   )
 }

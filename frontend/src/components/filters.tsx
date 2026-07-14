@@ -1,5 +1,6 @@
 import { ListFilter } from 'lucide-react'
 import { useMemo, useSyncExternalStore } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -8,12 +9,13 @@ import { useUsers } from '../api/hooks'
 import { useStatusDefs } from './statuses'
 import { Avatar } from './ui'
 
-/** Global list filters — one setting, remembered, applied to every list.
- *  A module store (not per-component state) so the header menu and the lists
- *  it filters re-render together. */
+/** List filters — remembered and applied to every list. A module store (not
+ *  per-component state) so the header menu and the lists it filters re-render
+ *  together. show-done is remembered per tab (projects, board, backlog, …);
+ *  the rest is global. */
 
 const KEY = {
-  done: 'cortex.filter.done',
+  done: 'cortex.filter.done', // + '.<scope>'
   archived: 'cortex.filter.archived',
   users: 'cortex.filter.users',
 }
@@ -24,16 +26,28 @@ const read = (key: string, dflt: boolean) => {
 const readIds = (key: string): number[] =>
   (localStorage.getItem(key) ?? '').split(',').filter(Boolean).map(Number)
 
+// the tab a route belongs to: '/' → home, '/projects/5' → projects,
+// '/s/1/board' → board (space-scoped routes carry an /s/:spaceId prefix)
+const scopeOf = (pathname: string) => {
+  const seg = pathname.split('/').filter(Boolean)
+  return (seg[0] === 's' ? seg[2] : seg[0]) || 'home'
+}
+
 let state = {
-  showDone: read(KEY.done, true),
+  done: {} as Record<string, boolean>, // per-tab, read lazily
   showArchived: read(KEY.archived, false),
   userIds: readIds(KEY.users),
 }
 const subs = new Set<() => void>()
 
-function set(patch: Partial<typeof state>) {
+function setDone(scope: string, v: boolean) {
+  state = { ...state, done: { ...state.done, [scope]: v } }
+  localStorage.setItem(`${KEY.done}.${scope}`, v ? '1' : '0')
+  subs.forEach((fn) => fn())
+}
+
+function set(patch: Partial<Pick<typeof state, 'showArchived' | 'userIds'>>) {
   state = { ...state, ...patch }
-  localStorage.setItem(KEY.done, state.showDone ? '1' : '0')
   localStorage.setItem(KEY.archived, state.showArchived ? '1' : '0')
   localStorage.setItem(KEY.users, state.userIds.join(','))
   subs.forEach((fn) => fn())
@@ -47,10 +61,16 @@ function toggleUser(id: number) {
 }
 
 export function useListFilters() {
-  return useSyncExternalStore(
+  const { pathname } = useLocation()
+  const s = useSyncExternalStore(
     (cb) => { subs.add(cb); return () => subs.delete(cb) },
     () => state,
   )
+  return {
+    showDone: s.done[scopeOf(pathname)] ?? read(`${KEY.done}.${scopeOf(pathname)}`, true),
+    showArchived: s.showArchived,
+    userIds: s.userIds,
+  }
 }
 
 /** Drop items whose status is a done status, unless "show done" is on. */
@@ -99,6 +119,7 @@ export function FilterMenu({ done = true, archived = false, users = false }: {
   users?: boolean
 }) {
   const filters = useListFilters()
+  const { pathname } = useLocation()
   const allUsers = useUsers()
   const active = (allUsers.data ?? []).filter((u) => u.is_active)
   const filtering =
@@ -119,7 +140,7 @@ export function FilterMenu({ done = true, archived = false, users = false }: {
         {done && (
           <DropdownMenuCheckboxItem
             checked={filters.showDone}
-            onCheckedChange={(c) => set({ showDone: c === true })}
+            onCheckedChange={(c) => setDone(scopeOf(pathname), c === true)}
           >
             Show done
           </DropdownMenuCheckboxItem>

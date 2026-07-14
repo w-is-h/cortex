@@ -354,4 +354,14 @@ MIGRATIONS: list[str] = [
     END;
     PRAGMA foreign_keys=ON;
     """,
+    # v10: projects get a priority, same vocabulary as tasks
+    """
+    ALTER TABLE projects ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';
+    """,
+    # v11: project milestones — a JSON list of {title, date}, kept sorted by date.
+    # Pure value objects (no relations), so a column, not a table; updates replace
+    # the whole set, like tags.
+    """
+    ALTER TABLE projects ADD COLUMN milestones TEXT NOT NULL DEFAULT '[]';
+    """,
 ]

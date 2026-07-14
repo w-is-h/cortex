@@ -179,6 +179,30 @@ def test_projects(admin):
     # stream projects have no due date; the lifecycle default is todo
     stream = admin.post("/api/projects", json={"space_id": 1, "title": "maintenance"}).json()
     assert stream["due_date"] is None and stream["status"] == "todo"
+    # priority defaults to medium, same vocabulary as tasks
+    assert stream["priority"] == "medium"
+    hot = admin.patch(f"/api/projects/{stream['id']}", json={"priority": "urgent"}).json()
+    assert hot["priority"] == "urgent"
+    assert admin.patch(f"/api/projects/{stream['id']}",
+                       json={"priority": "asap"}).status_code == 422
+
+
+def test_project_milestones(admin):
+    # stored sorted by date regardless of input order
+    p = admin.post("/api/projects", json={
+        "space_id": 1, "title": "Rollout",
+        "milestones": [{"title": "beta", "date": "2026-10-01"},
+                       {"title": "alpha", "date": "2026-08-15"}],
+    }).json()
+    assert [m["title"] for m in p["milestones"]] == ["alpha", "beta"]
+    # updates replace the whole set, like tags
+    got = admin.patch(f"/api/projects/{p['id']}", json={
+        "milestones": [{"title": "launch", "date": "2026-12-01"}]}).json()
+    assert [m["title"] for m in got["milestones"]] == ["launch"]
+    cleared = admin.patch(f"/api/projects/{p['id']}", json={"milestones": []}).json()
+    assert cleared["milestones"] == []
+    assert admin.patch(f"/api/projects/{p['id']}", json={
+        "milestones": [{"title": "bad", "date": "not-a-date"}]}).status_code == 422
 
 
 def test_project_tags(admin):

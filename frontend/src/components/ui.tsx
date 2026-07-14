@@ -108,12 +108,14 @@ export function Button({
   )
 }
 
+// a div, not a <label>: label click-forwarding sends any click in the field to
+// its first button — for fields whose first button is a remove ×, that deletes
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
+    <div>
       <span className="block text-xs font-medium text-ink-dim mb-1">{label}</span>
       {children}
-    </label>
+    </div>
   )
 }
 

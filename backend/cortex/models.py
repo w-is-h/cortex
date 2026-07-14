@@ -89,6 +89,11 @@ class SprintUpdate(BaseModel):
     archived: bool | None = None
 
 
+class Milestone(BaseModel):
+    title: str
+    date: date
+
+
 class ProjectOut(BaseModel):
     id: int
     space_id: int
@@ -98,7 +103,9 @@ class ProjectOut(BaseModel):
     start_date: date | None
     owner_id: int | None = None
     status: ProjectStatus = "todo"
+    priority: Priority = "medium"
     tags: list[str] = []
+    milestones: list[Milestone] = []
     archived: bool
     created_at: str
     open_tasks: int = 0
@@ -113,7 +120,9 @@ class ProjectCreate(BaseModel):
     start_date: date | None = None
     owner_id: int | None = None
     status: ProjectStatus = "todo"
+    priority: Priority = "medium"
     tags: list[str] = []
+    milestones: list[Milestone] = []
 
 
 class ProjectUpdate(BaseModel):
@@ -123,7 +132,9 @@ class ProjectUpdate(BaseModel):
     start_date: date | None = None
     owner_id: int | None = None
     status: ProjectStatus | None = None
+    priority: Priority | None = None
     tags: list[str] | None = None
+    milestones: list[Milestone] | None = None
     archived: bool | None = None
 
 
