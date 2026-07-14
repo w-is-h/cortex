@@ -205,7 +205,7 @@ export function Shell() {
               <button
                 onClick={toggleCollapsed}
                 title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className="grid place-items-center size-8 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
+                className="grid place-items-center size-8 shrink-0 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
               >
                 {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
               </button>
@@ -286,7 +286,7 @@ function ThemeToggle() {
     <button
       onClick={toggle}
       title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
-      className="grid place-items-center size-8 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
+      className="grid place-items-center size-8 shrink-0 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
     >
       {theme === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
     </button>
@@ -302,10 +302,12 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         title={collapsed ? me.data.username : undefined}
-        className={`flex items-center gap-2 py-1.5 rounded-lg hover:bg-raised transition-colors max-w-36 outline-none ${collapsed ? 'px-1.5' : 'px-2'}`}
+        className={`flex items-center gap-2 py-1.5 rounded-lg hover:bg-raised transition-colors min-w-0 outline-none ${collapsed ? 'px-1.5' : 'px-2'}`}
       >
         <Avatar name={me.data.username} size={22} />
-        {!collapsed && <span className="text-sm font-medium truncate">{me.data.username}</span>}
+        {/* min-w-0: without it this flex item keeps its content width and a long
+            name paints over the footer icons instead of truncating */}
+        {!collapsed && <span className="text-sm font-medium truncate min-w-0">{me.data.username}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-44">
         <DropdownMenuGroup>

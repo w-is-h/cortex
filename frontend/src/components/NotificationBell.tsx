@@ -22,7 +22,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className="relative p-2 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
+        className="relative p-2 shrink-0 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
         title="Notifications"
       >
         <Bell className="size-4" />
