@@ -9,8 +9,7 @@ clean SPA.
 The core is small and opinionated, and extending it is an agent's job. If you
 need a feature, ask your agent and point it at [AGENTS.md](AGENTS.md) — the
 maintainer's manual with the rules, invariants, and worked examples needed to
-extend cortex safely. Your copy diverges as you extend it; upstream takes bug
-fixes, performance, and schema/migration work.
+extend cortex safely.
 
 ## What you get
 
@@ -67,3 +66,14 @@ attributed to it. The MCP surface is 20 tools covering the verbs an agent
 performs: tasks (create/update/move/delete, blockers), sprints, projects,
 comments, full-text `search`, notifications, and one `get_workspace` call that
 returns who you are plus every id and status key the other tools expect.
+
+## Contributing
+
+Upstream stays minimal. PRs are welcome when they improve the core for
+everyone: bug fixes, performance, design, schema/migration work, or a small
+feature that is useful in any deployment.
+
+A feature specific to your team belongs in your fork: have your agent build it
+there ([AGENTS.md](AGENTS.md) is the manual), and merge from main to keep
+receiving core updates. If your fork diverges too far to merge cheaply, keep
+building your own thing and stop tracking upstream.
