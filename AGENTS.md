@@ -57,7 +57,7 @@ Decide early which kind of fork you are; the contract weighs differently.
       services/       all domain logic
       routers/        thin REST shims over services
       mcp_server.py   20 MCP tools over the same services (/mcp, Bearer ck_*)
-    backend/tests/    32 tests; conftest boots the real app on a tmp SQLite
+    backend/tests/    33 tests; conftest boots the real app on a tmp SQLite
     frontend/src/     Vite + React SPA (react-query, hello-pangea/dnd, tailwind)
 
 ## Domain invariants (enforced in services/, covered by tests)
@@ -91,7 +91,7 @@ Decide early which kind of fork you are; the contract weighs differently.
 
 ## Verify
 
-- `uv run pytest` — 32 tests, ~1 second. This is the gate.
+- `uv run pytest` — 33 tests, ~1 second. This is the gate.
 - Live: `./start.sh`, then `scripts/smoke.sh` and `uv run scripts/mcp_check.py`.
   Both write to the live DB — clean up what they create.
 - Frontend: `cd frontend && npm run build` must be clean.
