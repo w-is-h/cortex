@@ -56,8 +56,8 @@ Decide early which kind of fork you are; the contract weighs differently.
       errors.py       CortexError → HTTP status mapping
       services/       all domain logic
       routers/        thin REST shims over services
-      mcp_server.py   24 MCP tools over the same services (/mcp, Bearer ck_*)
-    backend/tests/    37 tests; conftest boots the real app on a tmp SQLite
+      mcp_server.py   25 MCP tools over the same services (/mcp, Bearer ck_*)
+    backend/tests/    38 tests; conftest boots the real app on a tmp SQLite
     frontend/src/     Vite + React SPA (react-query, hello-pangea/dnd, tailwind)
 
 ## Domain invariants (enforced in services/, covered by tests)
@@ -93,7 +93,7 @@ Decide early which kind of fork you are; the contract weighs differently.
 
 ## Verify
 
-- `uv run pytest` — 37 tests, ~1 second. This is the gate.
+- `uv run pytest` — 38 tests, ~1 second. This is the gate.
 - Live: `./start.sh`, then `scripts/smoke.sh` and `uv run scripts/mcp_check.py`.
   Both write to the live DB — clean up what they create.
 - Frontend: `cd frontend && npm run build` must be clean.
@@ -102,6 +102,6 @@ Decide early which kind of fork you are; the contract weighs differently.
 
 Mint a `ck_*` key on your Account page (user menu), connect to `/mcp` (streamable HTTP, same key as
 REST). Start every session with `get_workspace` — it returns who you are, the
-spaces, users, status vocabularies, and the project tags in use. 24 tools;
+spaces, users, status vocabularies, and the project tags in use. 25 tools;
 `update_task`/`update_project` take `clear=[...]` to empty nullable fields;
 `list_notifications` marks what it returns as read.

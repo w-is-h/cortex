@@ -38,6 +38,13 @@ def update_project(project_id: int, body: ProjectUpdate,
     return projects.update(db, user, project_id, body.model_dump(exclude_unset=True))
 
 
+@router.delete("/{project_id}")
+def delete_project(project_id: int, user: User = Depends(require_user),
+                   db: sqlite3.Connection = Depends(get_db)):
+    projects.delete(db, user, project_id)
+    return {"ok": True}
+
+
 @router.post("/{project_id}/comments", response_model=CommentOut)
 def add_comment(project_id: int, body: CommentCreate,
                 user: User = Depends(require_user),

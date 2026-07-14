@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bucketBy } from '@/lib/utils'
-import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
+import { useCreateProject, useDeleteProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { Project } from '../api/types'
 import { FilterMenu, useListFilters, useVisibleProjects } from '../components/filters'
 import { useSpace } from '../components/Shell'
@@ -283,11 +283,12 @@ function List({ projects, groupBy, onTagClick, selection }: {
   )
 }
 
-/** Bulk actions for selected projects: status, owner, archive. */
+/** Bulk actions for selected projects: status, priority, owner, archive, delete. */
 function ProjectBar({ selection }: { selection: Selection }) {
   const { list: statuses } = useStatusDefs('project')
   const users = useUsers()
   const update = useUpdateProject()
+  const del = useDeleteProject()
   const ids = [...selection.selected]
   const apply = async (patch: Partial<Project>) => {
     await Promise.all(ids.map((id) => update.mutateAsync({ id, ...patch })))
@@ -328,6 +329,18 @@ function ProjectBar({ selection }: { selection: Selection }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <Button size="sm" onClick={() => apply({ archived: true })}>Archive</Button>
+      <Button
+        kind="danger"
+        size="sm"
+        onClick={async () => {
+          const n = ids.length
+          if (!confirm(`Delete ${n} project${n === 1 ? '' : 's'}? Their tasks will stay, detached. This cannot be undone.`)) return
+          await Promise.all(ids.map((id) => del.mutateAsync(id)))
+          selection.clear()
+        }}
+      >
+        Delete
+      </Button>
     </ActionBar>
   )
 }

@@ -62,7 +62,7 @@ claude mcp add --transport http cortex http://localhost:8000/mcp \
 ```
 
 A key acts as its owner, so give an agent its own user if you want its actions
-attributed to it. The MCP surface is 24 tools covering the verbs an agent
+attributed to it. The MCP surface is 25 tools covering the verbs an agent
 performs: tasks (create/update/move/delete, blockers), sprints, projects,
 comments (with reactions), users (`create_user`, admin keys only), full-text
 `search`, notifications, and one `get_workspace` call that returns who you are

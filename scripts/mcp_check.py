@@ -23,7 +23,7 @@ EXPECTED_TOOLS = {
     "list_tasks", "get_task", "create_task", "update_task", "delete_task",
     "move_tasks", "add_blocker", "remove_blocker", "add_comment",
     "update_comment", "delete_comment", "add_reaction", "remove_reaction",
-    "list_projects", "get_project", "create_project",
+    "list_projects", "get_project", "create_project", "delete_project",
     "update_project", "search", "list_notifications",
 }
 

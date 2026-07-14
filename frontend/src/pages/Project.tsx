@@ -1,7 +1,7 @@
-import { Archive, ChevronRight, History, Plus, X } from 'lucide-react'
+import { Archive, ChevronRight, History, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useDeleteProject, useProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { Milestone, Priority, ProjectDetail } from '../api/types'
 import { Feed } from '../components/Feed'
 import { FilterMenu } from '../components/filters'
@@ -24,6 +24,8 @@ export function ProjectPage() {
 function ProjectView({ project }: { project: ProjectDetail }) {
   const { space } = useSpace()
   const update = useUpdateProject()
+  const del = useDeleteProject()
+  const navigate = useNavigate()
   const users = useUsers()
   const siblings = useProjects(space.id, true)
   const vocab = [...new Set((siblings.data ?? []).flatMap((p) => p.tags))].sort()
@@ -158,12 +160,25 @@ function ProjectView({ project }: { project: ProjectDetail }) {
           <TaskTable tasks={project.tasks} selection={selection} showSprint />
         </section>
 
-        <div className="mt-6 pt-4 border-t border-line flex justify-center">
+        <div className="mt-6 pt-4 border-t border-line flex justify-center gap-8">
           <button
             className="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink transition-colors"
             onClick={() => update.mutate({ id: project.id, archived: !project.archived })}
           >
             <Archive className="size-4" /> {project.archived ? 'Unarchive project' : 'Archive project'}
+          </button>
+          <button
+            className="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-prio-urgent transition-colors"
+            onClick={async () => {
+              const n = project.total_tasks
+              if (!confirm(`Delete "${project.title}"?${
+                n ? ` Its ${n} task${n === 1 ? '' : 's'} will stay, detached from the project.` : ''
+              } This cannot be undone.`)) return
+              await del.mutateAsync(project.id)
+              navigate('/projects')
+            }}
+          >
+            <Trash2 className="size-4" /> Delete project
           </button>
         </div>
       </div>

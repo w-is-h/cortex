@@ -262,6 +262,15 @@ export function useCreateProject() {
   })
 }
 
+export function useDeleteProject() {
+  const qc = useQueryClient()
+  const invalidate = useInvalidateTasks() // its tasks survive detached — refresh their chips
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/api/projects/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); invalidate() },
+  })
+}
+
 export function useUpdateProject() {
   const qc = useQueryClient()
   return useMutation({

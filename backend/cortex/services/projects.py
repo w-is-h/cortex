@@ -77,6 +77,16 @@ def create(db: sqlite3.Connection, actor: User, data: dict) -> dict:
     return get(db, cur.lastrowid)
 
 
+def delete(db: sqlite3.Connection, actor: User, project_id: int) -> None:
+    get(db, project_id)
+    # tasks outlive their project: detach, don't delete. Comments are polymorphic
+    # (no FK cascade reaches them); notifications cascade via FK.
+    db.execute("UPDATE tasks SET project_id = NULL WHERE project_id = ?", (project_id,))
+    db.execute("DELETE FROM comments WHERE parent_type = 'project' AND parent_id = ?",
+               (project_id,))
+    db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+
+
 def detail(db: sqlite3.Connection, project: dict) -> dict:
     """Attach comments and tasks to a project dict."""
     project["comments"] = comments.list_for(db, "project", project["id"])

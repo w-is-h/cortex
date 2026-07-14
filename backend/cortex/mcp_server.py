@@ -258,6 +258,14 @@ def create_project(space_id: int, title: str, description: str = "",
             "milestones": [m.model_dump() for m in milestones or []]})
 
 
+def delete_project(project_id: int) -> dict:
+    """Delete a project permanently, with its comments. Its tasks survive,
+    detached from the project. Prefer archiving for anything with history."""
+    with db.transaction() as conn:
+        projects.delete(conn, current_user(), project_id)
+        return {"ok": True}
+
+
 ClearableProjectField = Literal["owner_id", "start_date", "due_date", "description"]
 
 
@@ -312,7 +320,7 @@ TOOLS = [get_workspace, create_user, list_sprints, create_sprint, update_sprint,
          list_tasks, get_task, create_task, update_task, delete_task, move_tasks,
          add_blocker, remove_blocker, add_comment, update_comment, delete_comment,
          add_reaction, remove_reaction,
-         list_projects, get_project, create_project, update_project,
+         list_projects, get_project, create_project, update_project, delete_project,
          search, list_notifications]
 
 

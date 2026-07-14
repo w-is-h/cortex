@@ -205,6 +205,17 @@ def test_project_milestones(admin):
         "milestones": [{"title": "bad", "date": "not-a-date"}]}).status_code == 422
 
 
+def test_delete_project(admin):
+    p = make_project(admin, title="doomed")
+    t = make_task(admin, project_id=p["id"])
+    admin.post(f"/api/projects/{p['id']}/comments", json={"body": "note"})
+    assert admin.delete(f"/api/projects/{p['id']}").json() == {"ok": True}
+    assert admin.get(f"/api/projects/{p['id']}").status_code == 404
+    # tasks survive, detached
+    assert admin.get(f"/api/tasks/{t['id']}").json()["project_id"] is None
+    assert admin.delete(f"/api/projects/{p['id']}").status_code == 404
+
+
 def test_project_tags(admin):
     p = make_project(admin, title="deploy", tags=["#Live", "Client ACME", "live"])
     assert p["tags"] == ["live", "client-acme"]  # normalized, deduped, ordered
