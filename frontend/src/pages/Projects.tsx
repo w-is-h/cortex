@@ -80,7 +80,7 @@ export function Projects() {
 
       {!items.length && <Empty>No projects in {space.name} yet.</Empty>}
       {items.length > 0 && (view === 'list'
-        ? <div className="max-w-5xl mx-auto"><List projects={items} groupBy={group} onTagClick={toggleTag} /></div>
+        ? <div><List projects={items} groupBy={group} onTagClick={toggleTag} /></div>
         : <Timeline projects={items.filter((p) => p.due_date)} groupBy={group} />)}
 
       <NewProjectModal open={creating} onClose={() => setCreating(false)} />

@@ -123,7 +123,7 @@ export function Board() {
       {view === 'kanban' ? (
         <Kanban tasks={visible} statuses={columns} selection={selection} onAdd={setNewTask} />
       ) : (
-        <div className="max-w-5xl mx-auto">
+        <div>
           <TaskTable tasks={visible} selection={selection} showProject={listGroup !== 'project'}
                      groupBy={listGroup === 'none' ? undefined : listGroup} />
         </div>

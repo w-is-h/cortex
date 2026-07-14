@@ -28,7 +28,7 @@ export function Sprints() {
         <Button kind="primary" onClick={() => setCreating(true)}><Plus /> Sprint</Button>
       </div>
 
-      <div className="max-w-5xl mx-auto">
+      <div>
         {!items.length && <Empty>No sprints in {space.name} yet.</Empty>}
         {active.length > 0 && <SprintList sprints={active} />}
         {showArchived && archived.length > 0 && (

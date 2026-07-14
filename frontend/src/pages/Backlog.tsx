@@ -43,7 +43,7 @@ export function Backlog() {
         </Button>
         <Button kind="primary" onClick={() => setNewTask(true)}>+ Task</Button>
       </div>
-      <div className="max-w-5xl mx-auto">
+      <div>
         <TaskTable
           tasks={items}
           selection={selection}
