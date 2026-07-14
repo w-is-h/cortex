@@ -633,15 +633,20 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
               </Link>
             )
           })}
-          {/* milestone diamonds, over the bars */}
+          {/* milestone diamonds, over the bars — a generous hit area around each
+              small diamond, with an instant CSS tooltip (native title is slow) */}
           {rows.flatMap(({ p, top }) =>
             p.milestones.map((m) => (
               <span
                 key={`${p.id}-${m.date}-${m.title}`}
-                className="absolute z-10 size-2.5 rotate-45 rounded-[2px] bg-panel border-2 border-brand"
-                style={{ top: top + 7, left: x(ts(m.date)) - 5 }}
-                title={`${m.title} · ${fmtDate(m.date)}`}
-              />
+                className="absolute z-10 group/ms grid place-items-center"
+                style={{ top: top + 1, left: x(ts(m.date)) - 11, width: 22, height: 22 }}
+              >
+                <span className="size-2.5 rotate-45 rounded-[2px] bg-panel border-2 border-brand" />
+                <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-card border border-line shadow-md text-[11px] whitespace-nowrap opacity-0 group-hover/ms:opacity-100 pointer-events-none transition-opacity duration-75">
+                  {m.title} <span className="text-ink-faint font-mono">{fmtDate(m.date)}</span>
+                </span>
+              </span>
             )),
           )}
         </div>
