@@ -9,6 +9,7 @@ import { FilterMenu, useListFilters, useVisibleByStatus } from '../components/fi
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
+import { PersonMenu } from '../components/TaskBits'
 import {
   Avatar, Button, Empty, Field, fmtDate, inputCls, Modal, Pick, projectHue,
   RowAccent, rowCls, rowHoverCls, SegmentedToggle,
@@ -125,7 +126,6 @@ function List({ projects, groupBy, onTagClick }: {
   const rowInner = (p: Project) => {
     const overdue = p.due_date != null && ts(p.due_date) < today() && p.open_tasks > 0
     const done = p.total_tasks - p.open_tasks
-    const owner = users.data?.find((u) => u.id === p.owner_id)
     return (
       <Link
         to={`/projects/${p.id}`}
@@ -133,9 +133,17 @@ function List({ projects, groupBy, onTagClick }: {
         className={`${rowCls} ${rowHoverCls} gap-3 pl-4 pr-3 py-2`}
       >
         <RowAccent color={`hsl(${projectHue(p.id)} 70% 60%)`} />
-        {owner
-          ? <Avatar name={owner.username} size={20} />
-          : <span className="size-5 shrink-0 rounded-full border border-dashed border-line-strong" title="No owner" />}
+        {/* inside a Link: cancel navigation in capture phase — the trigger's own
+            handler stops propagation, so a bubble-phase preventDefault never runs */}
+        <span onClickCapture={(e) => e.preventDefault()} className="shrink-0 grid place-items-center">
+          <PersonMenu
+            currentId={p.owner_id}
+            size={20}
+            clearLabel="No owner"
+            verb="Set owner"
+            onPick={(owner_id) => update.mutate({ id: p.id, owner_id })}
+          />
+        </span>
         <span className={`text-[1.02rem] font-medium truncate ${p.archived ? 'text-ink-faint' : ''}`}>
           {p.title}
         </span>

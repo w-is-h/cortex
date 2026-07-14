@@ -94,18 +94,22 @@ export function ProjectChip({ projectId }: { projectId: number | null }) {
   )
 }
 
-/** Clickable assignee avatar → dropdown to (re)assign the task. */
-export function AssigneeMenu({ task, size = 22 }: { task: Task; size?: number }) {
+/** Clickable avatar → dropdown to pick a person or clear the slot. */
+export function PersonMenu({ currentId, onPick, size = 22, clearLabel = 'Unassigned', verb = 'Assign' }: {
+  currentId: number | null
+  onPick: (id: number | null) => void
+  size?: number
+  clearLabel?: string
+  verb?: string
+}) {
   const users = useUsers()
-  const update = useUpdateTask()
-  const current = users.data?.find((u) => u.id === task.assignee_id)
-  const set = (assignee_id: number | null) => update.mutate({ id: task.id, assignee_id })
+  const current = users.data?.find((u) => u.id === currentId)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         onClick={(e) => e.stopPropagation()}
         className="rounded-full outline-none hover:brightness-110 transition-[filter]"
-        title={current ? `Assigned to ${current.username} — click to change` : 'Assign'}
+        title={current ? `${current.username} — click to change` : verb}
       >
         {current ? (
           <Avatar name={current.username} size={size} />
@@ -117,22 +121,34 @@ export function AssigneeMenu({ task, size = 22 }: { task: Task; size?: number })
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="w-44">
-        <DropdownMenuItem onClick={() => set(null)}>
+        <DropdownMenuItem onClick={() => onPick(null)}>
           <span className="size-4 rounded-full border border-dashed border-line-strong grid place-items-center">
             <UserRound className="size-2.5 text-ink-faint" />
           </span>
-          Unassigned
-          {task.assignee_id == null && <Check className="ml-auto size-3.5 text-brand" />}
+          {clearLabel}
+          {currentId == null && <Check className="ml-auto size-3.5 text-brand" />}
         </DropdownMenuItem>
         {users.data?.filter((u) => u.is_active).map((u) => (
-          <DropdownMenuItem key={u.id} onClick={() => set(u.id)}>
+          <DropdownMenuItem key={u.id} onClick={() => onPick(u.id)}>
             <Avatar name={u.username} size={16} />
             <span className="truncate">{u.username}</span>
-            {u.id === task.assignee_id && <Check className="ml-auto size-3.5 text-brand" />}
+            {u.id === currentId && <Check className="ml-auto size-3.5 text-brand" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Clickable assignee avatar → dropdown to (re)assign the task. */
+export function AssigneeMenu({ task, size = 22 }: { task: Task; size?: number }) {
+  const update = useUpdateTask()
+  return (
+    <PersonMenu
+      currentId={task.assignee_id}
+      size={size}
+      onPick={(assignee_id) => update.mutate({ id: task.id, assignee_id })}
+    />
   )
 }
 
