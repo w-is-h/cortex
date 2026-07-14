@@ -11,6 +11,7 @@ from datetime import date
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from . import db
 from .auth import User, user_from_api_key
@@ -274,8 +275,13 @@ TOOLS = [get_workspace, list_sprints, create_sprint, update_sprint,
 
 def build_mcp() -> FastMCP:
     """Fresh instance per app — a FastMCP session manager can only run once."""
+    # Host-header (DNS-rebinding) checking is off: it only admits localhost,
+    # breaking any non-localhost deployment, and every request is already
+    # authenticated by ApiKeyAuthMiddleware.
     mcp = FastMCP("cortex", stateless_http=True, json_response=True,
-                  streamable_http_path="/")
+                  streamable_http_path="/",
+                  transport_security=TransportSecuritySettings(
+                      enable_dns_rebinding_protection=False))
     for fn in TOOLS:
         mcp.add_tool(fn)
     return mcp
