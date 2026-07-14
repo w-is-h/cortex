@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { bucketBy } from '@/lib/utils'
 import { useCreateProject, useProjects, useUpdateProject, useUsers } from '../api/hooks'
 import type { Project } from '../api/types'
-import { FilterMenu, useListFilters, useVisibleByStatus } from '../components/filters'
+import { FilterMenu, useListFilters, useVisibleProjects } from '../components/filters'
 import { useSpace } from '../components/Shell'
 import { StatusBadge, useStatusDefs } from '../components/statuses'
 import { TagChip } from '../components/tags'
@@ -34,7 +34,7 @@ export function Projects() {
   const [creating, setCreating] = useState(false)
   const [tagFilter, setTagFilter] = useState<string[]>([])
 
-  const all = useVisibleByStatus(projects.data ?? [], 'project')
+  const all = useVisibleProjects(projects.data ?? [])
   const vocab = useMemo(
     () => [...new Set((projects.data ?? []).flatMap((p) => p.tags))].sort(),
     [projects.data],
@@ -57,7 +57,7 @@ export function Projects() {
           </span>
         )}
         <div className="flex-1" />
-        <FilterMenu archived />
+        <FilterMenu archived users />
         <SegmentedToggle
           value={group}
           onChange={(v) => { setGroup(v); localStorage.setItem('cortex.projgroup', v) }}

@@ -65,18 +65,31 @@ export function useVisibleByStatus<T extends { status: string }>(
   )
 }
 
-/** Task lists: the status filter plus the people filter (no selection = everyone). */
-export function useVisibleTasks<T extends { status: string; assignee_id: number | null }>(
-  items: T[],
+/** People filter on some user-id field; no selection = everyone. */
+function useVisibleByPerson<K extends string, T extends Record<K, number | null>>(
+  items: T[], key: K,
 ): T[] {
-  const byStatus = useVisibleByStatus(items, 'task')
   const { userIds } = useListFilters()
   return useMemo(
     () => (userIds.length === 0
-      ? byStatus
-      : byStatus.filter((t) => t.assignee_id != null && userIds.includes(t.assignee_id))),
-    [byStatus, userIds],
+      ? items
+      : items.filter((i) => i[key] != null && userIds.includes(i[key] as number))),
+    [items, userIds, key],
   )
+}
+
+/** Task lists: the status filter plus the people filter on the assignee. */
+export function useVisibleTasks<T extends { status: string; assignee_id: number | null }>(
+  items: T[],
+): T[] {
+  return useVisibleByPerson(useVisibleByStatus(items, 'task'), 'assignee_id')
+}
+
+/** Project lists: the status filter plus the people filter on the owner. */
+export function useVisibleProjects<T extends { status: string; owner_id: number | null }>(
+  items: T[],
+): T[] {
+  return useVisibleByPerson(useVisibleByStatus(items, 'project'), 'owner_id')
 }
 
 /** Funnel dropdown for the page header; pages opt into the toggles that apply. */
