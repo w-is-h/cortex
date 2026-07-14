@@ -15,6 +15,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from . import db
 from .auth import User, user_from_api_key
+from .errors import Forbidden
 from .models import Milestone, Priority
 from .services import (comments, notifications, projects,
                        search as search_service, spaces, sprints, tasks, users)
@@ -61,6 +62,15 @@ class ApiKeyAuthMiddleware:
 
 
 # ---------------------------------------------------------------- tools
+
+def create_user(username: str, is_admin: bool = False) -> dict:
+    """Create a user (the key's owner must be an admin, matching REST).
+    Usernames are unique; login is by username, no password."""
+    if not current_user().is_admin:
+        raise Forbidden("admin only")
+    with db.transaction() as conn:
+        return users.create(conn, username, is_admin)
+
 
 def get_workspace() -> dict:
     """Everything needed to orient: who you are, all spaces, all users, the status
@@ -298,7 +308,7 @@ def list_notifications() -> dict:
         return out
 
 
-TOOLS = [get_workspace, list_sprints, create_sprint, update_sprint,
+TOOLS = [get_workspace, create_user, list_sprints, create_sprint, update_sprint,
          list_tasks, get_task, create_task, update_task, delete_task, move_tasks,
          add_blocker, remove_blocker, add_comment, update_comment, delete_comment,
          add_reaction, remove_reaction,

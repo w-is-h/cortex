@@ -9,6 +9,7 @@ import pytest
 from conftest import make_user
 from cortex import mcp_server
 from cortex.auth import User
+from cortex.errors import Forbidden
 
 
 @pytest.fixture
@@ -45,6 +46,18 @@ def test_comment_lifecycle(as_admin):
 
     assert mcp_server.delete_comment(c["id"]) == {"ok": True}
     assert mcp_server.get_task(t["id"])["comments"] == []
+
+
+def test_create_user_admin_only(as_admin):
+    made = mcp_server.create_user("carol")
+    assert made["username"] == "carol" and not made["is_admin"]
+
+    token = mcp_server.CURRENT_USER.set(User(made["id"], "carol", False))
+    try:
+        with pytest.raises(Forbidden):
+            mcp_server.create_user("mallory")
+    finally:
+        mcp_server.CURRENT_USER.reset(token)
 
 
 def test_notifications_auto_marked(as_admin, admin):

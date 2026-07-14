@@ -19,7 +19,7 @@ from mcp.client.streamable_http import streamablehttp_client
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 
 EXPECTED_TOOLS = {
-    "get_workspace", "list_sprints", "create_sprint", "update_sprint",
+    "get_workspace", "create_user", "list_sprints", "create_sprint", "update_sprint",
     "list_tasks", "get_task", "create_task", "update_task", "delete_task",
     "move_tasks", "add_blocker", "remove_blocker", "add_comment",
     "update_comment", "delete_comment", "add_reaction", "remove_reaction",
