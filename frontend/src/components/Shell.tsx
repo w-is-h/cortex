@@ -1,6 +1,6 @@
 import {
   ChartNoAxesGantt, Check, ChevronsUpDown, Columns3, House, Inbox, LogOut, Moon,
-  Plus, Repeat, Search, Sun, Users,
+  PanelLeftClose, PanelLeftOpen, Plus, Repeat, Search, Sun, Users,
 } from 'lucide-react'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -41,27 +41,42 @@ export function Logo({ size = 22 }: { size?: number }) {
   )
 }
 
-function NavItem({ to, icon: Icon, label, end }: {
+function NavItem({ to, icon: Icon, label, end, collapsed }: {
   to: string
   icon: React.ComponentType<{ className?: string }>
   label: string
   end?: boolean
+  collapsed: boolean
 }) {
   return (
     <NavLink
       to={to}
       end={end}
+      title={collapsed ? label : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-2.5 px-6 py-2 text-[16px] font-medium border-l-2 transition-colors duration-100 ` +
+        `flex items-center gap-2.5 py-2 text-[16px] font-medium border-l-2 transition-colors duration-100 ` +
+        (collapsed ? 'justify-center px-0 ' : 'px-6 ') +
         (isActive
           ? 'bg-[color-mix(in_oklab,var(--color-brand)_7%,transparent)] border-brand text-foreground'
           : 'text-ink-dim hover:text-ink hover:bg-raised border-transparent')
       }
     >
       <Icon className="size-4 shrink-0 opacity-80" />
-      {label}
+      {!collapsed && label}
     </NavLink>
   )
+}
+
+/** True below Tailwind's md breakpoint; tracks live resizes. */
+function useSmallScreen() {
+  const [small, setSmall] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const onChange = (e: MediaQueryListEvent) => setSmall(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return small
 }
 
 /** Redirect a legacy space-less path into the active space. */
@@ -83,6 +98,17 @@ export function Shell() {
   const spaceId = urlSpaceId ?? storedSpaceId
   const [searchOpen, setSearchOpen] = useState(false)
   const [newSpaceOpen, setNewSpaceOpen] = useState(false)
+  const smallScreen = useSmallScreen()
+  const [userCollapsed, setUserCollapsed] = useState(
+    () => localStorage.getItem('cortex.sidebar') === 'collapsed',
+  )
+  // small screens force the icon rail; the stored preference governs wide ones
+  const collapsed = smallScreen || userCollapsed
+  const toggleCollapsed = () => {
+    const next = !userCollapsed
+    setUserCollapsed(next)
+    localStorage.setItem('cortex.sidebar', next ? 'collapsed' : 'expanded')
+  }
 
   useEffect(() => {
     if (me.isError) navigate('/login', { replace: true })
@@ -133,45 +159,57 @@ export function Shell() {
     <Ctx.Provider value={ctx}>
       <div className="h-screen flex overflow-hidden">
         {/* ---------------------------------------------------- sidebar */}
-        <aside className="w-56 shrink-0 bg-panel border-r border-line flex flex-col">
-          <NavLink to="/" className="flex items-center gap-2.5 px-4 h-14 select-none">
+        <aside className={`${collapsed ? 'w-14' : 'w-56'} shrink-0 bg-panel border-r border-line flex flex-col`}>
+          <NavLink to="/" className={`flex items-center gap-2.5 h-14 select-none ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
             <Logo />
-            <span className="font-heading font-normal italic text-[1.7rem]">
-              cortex
-            </span>
+            {!collapsed && (
+              <span className="font-heading font-normal italic text-[1.7rem]">
+                cortex
+              </span>
+            )}
           </NavLink>
 
-          <div className="px-3 pb-2">
-            <SpaceSwitcher onNewSpace={() => setNewSpaceOpen(true)} />
+          <div className={`pb-2 ${collapsed ? 'px-1.5' : 'px-3'}`}>
+            <SpaceSwitcher onNewSpace={() => setNewSpaceOpen(true)} collapsed={collapsed} />
           </div>
 
-          <div className="px-3 pb-3">
+          <div className={`pb-3 ${collapsed ? 'px-1.5' : 'px-3'}`}>
             <button
               onClick={() => setSearchOpen(true)}
-              className="w-full flex items-center gap-2 text-sm text-ink-faint border border-line rounded-lg px-2.5 py-1.5 hover:border-line-strong hover:text-ink-dim transition-colors"
+              title={collapsed ? 'Search (⌘K)' : undefined}
+              className={`w-full flex items-center gap-2 text-sm text-ink-faint border border-line rounded-lg py-1.5 hover:border-line-strong hover:text-ink-dim transition-colors ${collapsed ? 'justify-center px-0' : 'px-2.5'}`}
             >
               <Search className="size-3.5" />
-              <span className="flex-1 text-left">Search</span>
-              <kbd>⌘K</kbd>
+              {!collapsed && <span className="flex-1 text-left">Search</span>}
+              {!collapsed && <kbd>⌘K</kbd>}
             </button>
           </div>
 
           <nav className="flex flex-col gap-0.5">
-            <NavItem to="/" icon={House} label="Home" end />
-            <NavItem to={`/s/${space.id}/board`} icon={Columns3} label="Board" />
-            <NavItem to={`/s/${space.id}/backlog`} icon={Inbox} label="Backlog" />
-            <NavItem to={`/s/${space.id}/sprints`} icon={Repeat} label="Sprints" />
-            <NavItem to={`/s/${space.id}/projects`} icon={ChartNoAxesGantt} label="Projects" />
-            {me.data.is_admin && <NavItem to="/admin" icon={Users} label="Admin" />}
+            <NavItem to="/" icon={House} label="Home" end collapsed={collapsed} />
+            <NavItem to={`/s/${space.id}/board`} icon={Columns3} label="Board" collapsed={collapsed} />
+            <NavItem to={`/s/${space.id}/backlog`} icon={Inbox} label="Backlog" collapsed={collapsed} />
+            <NavItem to={`/s/${space.id}/sprints`} icon={Repeat} label="Sprints" collapsed={collapsed} />
+            <NavItem to={`/s/${space.id}/projects`} icon={ChartNoAxesGantt} label="Projects" collapsed={collapsed} />
+            {me.data.is_admin && <NavItem to="/admin" icon={Users} label="Admin" collapsed={collapsed} />}
           </nav>
 
           <div className="flex-1" />
 
-          <div className="border-t border-line px-2 py-2 flex items-center gap-1">
-            <UserMenu />
-            <span className="flex-1" />
+          <div className={`border-t border-line py-2 flex items-center gap-1 ${collapsed ? 'flex-col px-0 gap-1.5' : 'px-2'}`}>
+            <UserMenu collapsed={collapsed} />
+            {!collapsed && <span className="flex-1" />}
             <ThemeToggle />
             <NotificationBell />
+            {!smallScreen && (
+              <button
+                onClick={toggleCollapsed}
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className="grid place-items-center size-8 rounded-lg text-ink-dim hover:text-ink hover:bg-raised transition-colors outline-none"
+              >
+                {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+              </button>
+            )}
           </div>
         </aside>
 
@@ -183,7 +221,7 @@ export function Shell() {
               'radial-gradient(900px 300px at 15% -5%, color-mix(in oklab, var(--color-brand) 4%, transparent), transparent), var(--background)',
           }}
         >
-          <div className="px-8 py-6 min-h-full">
+          <div className="px-8 max-md:px-4 py-6 min-h-full">
             <Outlet />
           </div>
         </main>
@@ -196,16 +234,23 @@ export function Shell() {
 }
 
 /** Pill-shaped space switcher: coloured glyph badge + name + chevron. */
-function SpaceSwitcher({ onNewSpace }: { onNewSpace: () => void }) {
+function SpaceSwitcher({ onNewSpace, collapsed }: { onNewSpace: () => void; collapsed: boolean }) {
   const { space, spaces, setSpaceId } = useSpace()
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="w-full flex items-center gap-2.5 rounded-xl border border-line bg-card px-2 py-1.5 hover:bg-raised transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 shadow-sm shadow-black/5 dark:shadow-none">
+      <DropdownMenuTrigger
+        title={collapsed ? space.name : undefined}
+        className={`w-full flex items-center gap-2.5 rounded-xl py-1.5 hover:bg-raised transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 ${
+          collapsed
+            ? 'justify-center px-0 border border-transparent'
+            : 'px-2 border border-line bg-card shadow-sm shadow-black/5 dark:shadow-none'
+        }`}
+      >
         <span className="grid place-items-center size-7 rounded-lg bg-brand text-brand-ink font-bold text-sm shrink-0 uppercase">
           {space.name.slice(0, 1)}
         </span>
-        <span className="flex-1 text-left text-sm font-semibold truncate">{space.name}</span>
-        <ChevronsUpDown className="size-3.5 text-ink-faint shrink-0" />
+        {!collapsed && <span className="flex-1 text-left text-sm font-semibold truncate">{space.name}</span>}
+        {!collapsed && <ChevronsUpDown className="size-3.5 text-ink-faint shrink-0" />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[13.5rem]">
         <DropdownMenuGroup>
@@ -248,16 +293,19 @@ function ThemeToggle() {
   )
 }
 
-function UserMenu() {
+function UserMenu({ collapsed }: { collapsed: boolean }) {
   const me = useMe()
   const logout = useLogout()
   const navigate = useNavigate()
   if (!me.data) return null
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-raised transition-colors max-w-36 outline-none">
+      <DropdownMenuTrigger
+        title={collapsed ? me.data.username : undefined}
+        className={`flex items-center gap-2 py-1.5 rounded-lg hover:bg-raised transition-colors max-w-36 outline-none ${collapsed ? 'px-1.5' : 'px-2'}`}
+      >
         <Avatar name={me.data.username} size={22} />
-        <span className="text-sm font-medium truncate">{me.data.username}</span>
+        {!collapsed && <span className="text-sm font-medium truncate">{me.data.username}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-44">
         <DropdownMenuGroup>
