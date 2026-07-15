@@ -2,18 +2,30 @@ import { Paperclip } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { visit } from 'unist-util-visit'
+import { useUsers } from '../api/hooks'
 import { openLightbox } from '../lib/lightbox'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** Wrap @mentions in <span class="mention"> (skipping code/links). */
-function rehypeMentions() {
+// chars a bare @token may contain; a username match must not be followed by
+// one, so '@ann' doesn't fire inside '@annika'
+const TOKEN = 'A-Za-z0-9_.-'
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Wrap @mentions in <span class="mention"> (skipping code/links). Known
+ *  usernames match in full — they may contain spaces — longest first;
+ *  anything else falls back to a single @token. */
+function rehypeMentions(usernames: string[] = []) {
+  const names = [...usernames]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => `${escapeRe(n)}(?![${TOKEN}])`)
+  const re = new RegExp(`@(?:${[...names, `[${TOKEN}]+`].join('|')})`, 'gi')
   return (tree: any) => {
     visit(tree, 'text', (node: any, index: number | undefined, parent: any) => {
       if (index === undefined || !parent?.tagName) return
       if (['code', 'pre', 'a'].includes(parent.tagName)) return
-      const re = /@[A-Za-z0-9_.-]+/g
       const value: string = node.value
+      re.lastIndex = 0
       if (!re.test(value)) return
       re.lastIndex = 0
       const parts: any[] = []
@@ -64,12 +76,14 @@ export function Markdown({
   /** When set, task-list checkboxes are clickable in view mode. */
   onToggleCheckbox?: (index: number, checked: boolean) => void
 }) {
+  const users = useUsers()
   if (!children.trim()) return null
+  const usernames = (users.data ?? []).map((u) => u.username)
   return (
     <div className="prose-cortex">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeMentions, rehypeCheckboxIndex]}
+        rehypePlugins={[[rehypeMentions, usernames], rehypeCheckboxIndex]}
         components={{
           a: (props) => {
             const { node, href, children, ...rest } = props as any

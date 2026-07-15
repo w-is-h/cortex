@@ -59,6 +59,21 @@ def test_mentions(admin, client):
     assert box["items"][0]["project_title"] == "proj"
 
 
+def test_mentions_username_with_space(admin, client):
+    make_user(admin, "Ann Smith")
+    login(client, "Ann Smith")
+    t = make_task(admin, title="x", description="ping @Ann Smith please")
+    assert client.get("/api/notifications").json()["unread"] == 1
+
+    # a longer word doesn't fire the shorter username inside it
+    admin.patch(f"/api/tasks/{t['id']}", json={"description": "cc @Ann Smithson"})
+    assert client.get("/api/notifications").json()["unread"] == 1
+
+    # case-insensitive, like single-token mentions
+    admin.post(f"/api/tasks/{t['id']}/comments", json={"body": "thanks @ann smith!"})
+    assert client.get("/api/notifications").json()["unread"] == 2
+
+
 def test_reactions(admin, client):
     make_user(admin, "bob")
     login(client, "bob")

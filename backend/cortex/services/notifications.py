@@ -3,7 +3,9 @@ import sqlite3
 
 from ..auth import User, now
 
-MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]+)")
+# chars a bare @token may contain; a username match must not be followed by
+# one, so '@ann' doesn't fire inside '@annika'
+TOKEN_CHARS = "A-Za-z0-9_.-"
 
 
 def notify(db: sqlite3.Connection, user_id: int | None, type_: str, actor: User,
@@ -20,13 +22,16 @@ def notify(db: sqlite3.Connection, user_id: int | None, type_: str, actor: User,
 
 
 def mentioned_user_ids(db: sqlite3.Connection, text: str) -> set[int]:
-    names = {m.lower() for m in MENTION_RE.findall(text or "")}
-    if not names:
+    """Usernames may contain spaces, so match each known @username against the
+    text rather than tokenizing the text."""
+    if not text or "@" not in text:
         return set()
-    placeholders = ",".join("?" * len(names))
-    rows = db.execute(
-        f"SELECT id FROM users WHERE lower(username) IN ({placeholders})", tuple(names))
-    return {r["id"] for r in rows}
+    ids = set()
+    for row in db.execute("SELECT id, username FROM users"):
+        pattern = f"@{re.escape(row['username'])}(?![{TOKEN_CHARS}])"
+        if re.search(pattern, text, re.IGNORECASE):
+            ids.add(row["id"])
+    return ids
 
 
 def notify_mentions(db: sqlite3.Connection, actor: User, text: str,
