@@ -17,9 +17,6 @@ def login(body: LoginIn, response: Response, db: sqlite3.Connection = Depends(ge
     if user is None or not user["is_active"]:
         raise Unauthorized("unknown username")
     token = auth.create_session(db, user["id"])
-    # commit now: get_db's teardown commit runs after the response is sent, and
-    # the client may use this credential before that lands (fast agents do)
-    db.commit()
     response.set_cookie(
         auth.SESSION_COOKIE, token,
         max_age=auth.SESSION_DAYS * 86400,
@@ -55,7 +52,6 @@ def create_api_key(body: ApiKeyCreate,
                    user: auth.User = Depends(auth.require_user),
                    db: sqlite3.Connection = Depends(get_db)):
     row, key = auth.create_api_key(db, user.id, body.name)
-    db.commit()  # same reason as login: the key may be used immediately
     return {**row, "key": key}
 
 

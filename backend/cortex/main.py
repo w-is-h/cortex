@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
             await self.app(scope, receive, send)
 
     app.add_middleware(McpPathRewrite)
+    app.add_middleware(db.DbPerRequest)
 
     return app
 
