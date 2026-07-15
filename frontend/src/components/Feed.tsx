@@ -1,7 +1,7 @@
 import { Pencil, SmilePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useCommentMutations, useUsers } from '../api/hooks'
+import { useCommentMutations, useSprints, useUsers } from '../api/hooks'
 import type { Activity, Comment } from '../api/types'
 import { Markdown } from './Markdown'
 import { MarkdownEditor } from './MarkdownEditor'
@@ -181,7 +181,6 @@ const ACT_TEXT: Record<string, string> = {
   status_changed: 'moved this to',
   priority_changed: 'set priority to',
   assigned: 'changed the assignee',
-  sprint_moved: 'moved this to another sprint',
   project_changed: 'changed the project',
   title_edited: 'edited the title',
   description_edited: 'edited the description',
@@ -190,14 +189,28 @@ const ACT_TEXT: Record<string, string> = {
 }
 
 function ActivityRow({ act }: { act: Activity }) {
+  const { space } = useSpace()
+  const sprints = useSprints(space.id)
   const to = act.detail?.to
   const showTo = act.type === 'status_changed' || act.type === 'priority_changed'
+  let text = ACT_TEXT[act.type] ?? act.type
+  let target: string | undefined
+  if (act.type === 'sprint_moved') {
+    if (to == null) {
+      text = 'moved this to the backlog'
+    } else {
+      text = 'moved this to'
+      // sprint deleted since → the generic phrasing
+      target = sprints.data?.find((s) => s.id === to)?.name ?? 'another sprint'
+    }
+  }
   return (
     <div className="flex items-center gap-2 text-xs text-ink-dim pl-1">
       <span className="size-1.5 rounded-full bg-line-strong shrink-0" />
       <span>
         <span className="font-medium text-ink">{act.actor_username}</span>{' '}
-        {ACT_TEXT[act.type] ?? act.type}
+        {text}
+        {target && <span className="font-medium text-ink"> {target}</span>}
         {showTo && <span className="font-medium text-ink"> {String(to).replace('_', ' ')}</span>}
       </span>
       <span className="text-ink-faint font-mono">{timeAgo(act.created_at)}</span>
