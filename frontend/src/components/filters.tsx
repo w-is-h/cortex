@@ -147,7 +147,7 @@ export function FilterMenu({ done = true, archived = false, empty = false, users
       >
         <ListFilter className="size-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-64">
+      <DropdownMenuContent align="end" className="w-fit max-w-64">
         {done && (
           <DropdownMenuCheckboxItem
             checked={filters.showDone}
