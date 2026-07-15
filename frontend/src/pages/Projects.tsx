@@ -373,6 +373,25 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
   const [hoverId, setHoverId] = useState<number | null>(null)
   const pxPerDay = scale === 'weeks' ? 20 : 6
 
+  // the name column is resizable; width is remembered across sessions
+  const [nameW, setNameW] = useState(() => Number(localStorage.getItem('cortex.tlnamew')) || 176)
+  const resize = useRef<{ x: number; w: number } | null>(null)
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const r = resize.current
+      if (!r) return
+      setNameW(Math.min(420, Math.max(112, r.w + e.clientX - r.x)))
+    }
+    const up = () => {
+      if (!resize.current) return
+      resize.current = null
+      setNameW((w) => { localStorage.setItem('cortex.tlnamew', String(w)); return w })
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
+  }, [])
+
   // live overrides while dragging a bar edge; committed to the server on release
   const [override, setOverride] = useState<Record<number, { start: number; end: number | null }>>({})
   const overrideRef = useRef(override)
@@ -541,7 +560,12 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
       <div className="flex">
         {/* sticky name column — group labels and project names live here,
             not on the bars, so they stay readable while the chart scrolls */}
-        <div className="w-44 shrink-0 border-r border-line p-4">
+        <div className="relative shrink-0 border-r border-line p-4" style={{ width: nameW }}>
+          <div
+            onMouseDown={(e) => { e.preventDefault(); resize.current = { x: e.clientX, w: nameW } }}
+            className="absolute -right-0.5 inset-y-0 w-1.5 cursor-col-resize z-10 hover:bg-brand/40"
+            title="Drag to resize"
+          />
           <div className="relative" style={{ height: totalH }}>
             {headers.map((h) => (
               <div key={h.key} className="absolute left-0 right-2 flex items-center h-6 text-sm truncate" style={{ top: h.top }}>
@@ -609,9 +633,9 @@ function Timeline({ projects, groupBy }: { projects: Project[]; groupBy: ProjGro
                   top,
                   left,
                   width,
-                  // fade only the last week or so, whatever the bar's length
+                  // the fade is a hint, not a feature: just the bar's last ~18px
                   background: end == null
-                    ? `linear-gradient(to right, ${color} ${Math.max(width - 10 * pxPerDay, width * 0.4)}px, transparent)`
+                    ? `linear-gradient(to right, ${color} ${Math.max(width - 18, width * 0.8)}px, transparent)`
                     : color,
                 }}
                 title={`${p.title} · ${fmtDate(isoLocal(start))} → ${end == null ? 'ongoing' : fmtDate(isoLocal(end))}`}
