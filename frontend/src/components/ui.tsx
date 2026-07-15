@@ -26,6 +26,16 @@ export const nameHue = (s: string) => {
   return (h * 137.508) % 360
 }
 
+// Up to two-letter initials from a name. Multi-part names (split on space,
+// dot, underscore, hyphen) give the first letter of the first two parts; a
+// single-part name gives its first two letters. Collisions are expected and
+// disambiguated by the per-name color + tooltip, not by more letters.
+export const initials = (name: string) => {
+  const parts = name.split(/[\s._-]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0])
+  return (parts[0] ?? '').slice(0, 2)
+}
+
 // one row language for every list (tasks, projects, sidebar panels): flat with
 // a hairline beneath; hover pops it to a card with a shadow and an accent bar.
 // Callers add their own spacing (gap/padding) and pair rowCls with rowHoverCls
@@ -64,7 +74,7 @@ export function Avatar({ name, size = 20 }: { name: string; size?: number }) {
       style={{ width: size, height: size, fontSize: size * 0.42,
                color: `hsl(${hue} 65% 20%)`, background: `hsl(${hue} 65% 62%)` }}
     >
-      {name.slice(0, 2)}
+      {initials(name)}
     </span>
   )
 }
